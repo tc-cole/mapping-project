@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AppSidebar from '$lib/components/widgets/navigation-sidebar.svelte';
+	import ChartSidebar from "$lib/components/widgets/charts-sidebar-drawer.svelte"
 	import DeckGL from '$lib/components/maps/DeckGL.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Chart } from 'layerchart';
@@ -8,6 +9,7 @@
 	import * as d3 from 'd3';
 
 	import * as Sheet from '$lib/components/ui/sheet';
+	import ChartsSidebar from '$lib/components/widgets/charts-sidebar-drawer.svelte';
 
 	const dateSeriesData = [
 		{
@@ -133,31 +135,6 @@
 	];
 </script>
 
-<Sidebar.Provider>
-	<AppSidebar />
-	<div class="z-10">
-		<Sheet.Root>
-			<Sheet.Trigger>Open</Sheet.Trigger>
-			<Sheet.Content
-				onOpenAutoFocus={(e: any) => {
-					e.preventDefault();
-				}}
 
-			>
-				<Sheet.Header>
-					<Sheet.Title>Charts</Sheet.Title>
-				</Sheet.Header>
-				Testing
-			</Sheet.Content>
-		</Sheet.Root>
-	</div>
-</Sidebar.Provider>
+<ChartsSidebar />
 
-<DeckGL />
-
-<style>
-	.container {
-		width: 500px;
-		height: 500px;
-	}
-</style>
