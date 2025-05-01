@@ -1,18 +1,26 @@
 <script lang="ts">
-	import AppSidebar from '$lib/components/widgets/navigation-sidebar.svelte';
+	import AppSidebar from '$lib/components/widgets/nav-sidebar/navigation-sidebar.svelte';
 	import DeckGL from '$lib/components/maps/DeckGL.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import ChartsSidebar from '$lib/components/widgets/charts-sidebar.svelte';
-	import MenuBar from '$lib/components/widgets/MenuBar.svelte';
-	
+	import ChartsSidebar from '$lib/components/widgets/charts/charts-sidebar.svelte';
+	import MenuBar from '$lib/components/widgets/menu/MenuBar.svelte';
+	import DataInput from '$lib/components/widgets/nav-sidebar/data-input.svelte';
 </script>
 
 <Sidebar.Provider>
 	<AppSidebar />
-	<div class="flex justify-center relative z-10">
+
+	<ChartsSidebar />
+
+
+	<!-- Centered MenuBar -->
+	<div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+
 		<MenuBar />
 	</div>
-	<ChartsSidebar />
 </Sidebar.Provider>
 
+<DataInput />
+
+<!-- Map full screen in the background -->
 <DeckGL />
