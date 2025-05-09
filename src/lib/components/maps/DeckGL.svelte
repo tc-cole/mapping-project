@@ -1,12 +1,9 @@
 <script lang="ts">
-	//import { layers, mostRecentChartID, allCharts } from '$lib/io/Stores';
+	import { layers as layerStore } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+
 	import { onDestroy, onMount } from 'svelte';
 	import { Deck } from '@deck.gl/core';
 	import mapboxgl from 'mapbox-gl';
-	import { writable } from 'svelte/store';
-	import Button from '../ui/button/button.svelte';
-
-	const layers = writable([]);
 
 	mapboxgl.accessToken =
 		'pk.eyJ1IjoiYXJwZXJ5YW4iLCJhIjoiY2l4cTJkc2t6MDAzcjJxcG9maWp1ZmFjMCJ9.XT957ywrTABjNFqGdp_37g';
@@ -23,6 +20,15 @@
 		bearing: 0
 	};
 
+	$effect(() => {
+		const updatedLayers = $layerStore
+			.filter((e) => e.ctor)
+			.map((e) => new e.ctor({ id: e.id, ...e.props }));
+		//1;
+		console.log(updatedLayers);
+		if (updatedLayers.length > 0) deckInstance.setProps({ layers: updatedLayers });
+	});
+
 	onMount(() => {
 		var id = 'base-map';
 
@@ -31,8 +37,6 @@
 			style: 'mapbox://styles/mapbox/navigation-night-v1',
 			...INITIAL_VIEW_STATE
 		});
-
-		layers.set([]);
 
 		deckInstance = new Deck({
 			canvas: 'deck-canvas',
@@ -67,12 +71,5 @@
 		position: fixed;
 		inset: 0;
 		z-index: 0;
-	}
-
-	.overlay-button {
-		position: absolute;
-		top: 1rem;
-		left: 1rem;
-		z-index: 10;
 	}
 </style>

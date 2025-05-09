@@ -1,35 +1,28 @@
 <script lang="ts">
-	import Search from '@lucide/svelte/icons/search';
+	import { LayerFactory } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import SidebarLayerEditor from './components/editable-layer.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { ChevronRight, Plus } from '@lucide/svelte';
-	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
-	import AddLayer from './add-layer.svelte';
-	import DataInput from './data-input.svelte';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import AddDataset from './components/add-dataset.svelte';
+	import { layers } from './io/layer-io.svelte';
+	import { Plus } from '@lucide/svelte';
 
-	// Menu items.
-
-	const storedLayers = $state([]);
-
-	const layers = [
-		{
-			title: 'Path',
-			isActive: false,
-			icon: Search,
-			action: null
-		},
-		{
-			title: 'Line',
-			isActive: false,
-			icon: Search,
-			action: null
-		}
-	];
+	function addLayer() {
+		layers.add(LayerFactory.blank());
+	}
 </script>
 
 <Sidebar.Root>
-	<Sidebar.Content >
-			<AddLayer />
+	<Sidebar.Content>
+		<AddDataset />
+		<Button onclick={addLayer}>
+			<span>Add Layer </span>
+			<Plus />
+		</Button>
+		{#each $layers as layer}
+			<SidebarLayerEditor {layer} />
+		{/each}
+		<!--
 		<Collapsible.Root open={true} class="group/collapsible">
 			<Sidebar.Group>
 				<Sidebar.GroupLabel
@@ -61,5 +54,6 @@
 				</Collapsible.Content>
 			</Sidebar.Group>
 		</Collapsible.Root>
+	-->
 	</Sidebar.Content>
 </Sidebar.Root>

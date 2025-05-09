@@ -4,7 +4,6 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ChartsSidebar from '$lib/components/widgets/charts/charts-sidebar.svelte';
 	import MenuBar from '$lib/components/widgets/menu/MenuBar.svelte';
-	import DataInput from '$lib/components/widgets/nav-sidebar/data-input.svelte';
 </script>
 
 <Sidebar.Provider>
@@ -12,15 +11,10 @@
 
 	<ChartsSidebar />
 
-
 	<!-- Centered MenuBar -->
-	<div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
-
+	<div class="absolute left-1/2 top-4 z-10 -translate-x-1/2 transform">
 		<MenuBar />
 	</div>
 </Sidebar.Provider>
 
-<DataInput />
-
-<!-- Map full screen in the background -->
 <DeckGL />
