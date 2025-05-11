@@ -5,6 +5,7 @@
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import Sectional from './utils/sectional.svelte';
 
 	const CHUNK_SIZE = 100000;
 
@@ -250,7 +251,6 @@
 		}
 	};
 
-	// Track changes in parameters and update the layer
 	$effect(() => {
 		if (hasInitialized && requiredColumnsSelected) {
 			updateMapLayers();
@@ -258,42 +258,21 @@
 	});
 </script>
 
-<div class="grid grid-cols-2 gap-2">
-	<div>
-		<Label>From Latitude</Label>
-		<ColumnDropdown bind:chosenColumn={fromLatitude} />
-	</div>
-	<div>
-		<Label>From Longitude</Label>
-		<ColumnDropdown bind:chosenColumn={fromLongitude} />
-	</div>
-</div>
+<Sectional label="Required Coordinates">
+	<ColumnDropdown bind:chosenColumn={fromLatitude} default_column="Starting Latitude" />
+	<ColumnDropdown bind:chosenColumn={fromLongitude} default_column="Starting Longitude" />
+	<ColumnDropdown bind:chosenColumn={toLatitude} default_column="Destination Latitude" />
+	<ColumnDropdown bind:chosenColumn={toLongitude} default_column="Destination Longitude" />
+</Sectional>
 
-<div class="mt-3 grid grid-cols-2 gap-2">
-	<div>
-		<Label>To Latitude</Label>
-		<ColumnDropdown bind:chosenColumn={toLatitude} />
-	</div>
-	<div>
-		<Label>To Longitude</Label>
-		<ColumnDropdown bind:chosenColumn={toLongitude} />
-	</div>
-</div>
+<Sectional label="Optional Columns">
+	<ColumnDropdown bind:chosenColumn={widthColumn} default_column="Width" />
+	<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" />
+	<ColumnDropdown bind:chosenColumn={labelColumn} default_column="Label" />
+</Sectional>
 
-<div class="mt-3 grid grid-cols-2 gap-2">
-	<div>
-		<Label>Width Column (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={widthColumn} />
-	</div>
-	<div>
-		<Label>Color Column (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={colorColumn} />
-	</div>
-</div>
-
-{#if colorColumn}
-	<div class="mt-2">
-		<Label>Color Scale</Label>
+<Sectional label="Color Settings">
+	{#if colorColumn}
 		<select
 			class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
 			bind:value={colorScale}
@@ -302,13 +281,12 @@
 				<option value={scale}>{scale}</option>
 			{/each}
 		</select>
-	</div>
-{/if}
+	{/if}
+</Sectional>
 
-<div class="mt-3">
+<Sectional label="Arc Style">
 	<div class="grid grid-cols-2 gap-4">
 		<div>
-			<Label>Arc Width</Label>
 			<input type="range" min="1" max="10" step="0.5" bind:value={arcWidth} class="w-full" />
 			<div class="flex justify-between text-xs text-gray-500">
 				<span>Thin</span>
@@ -316,7 +294,6 @@
 			</div>
 		</div>
 		<div>
-			<Label>Opacity</Label>
 			<input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
 			<div class="flex justify-between text-xs text-gray-500">
 				<span>Transparent</span>
@@ -324,12 +301,11 @@
 			</div>
 		</div>
 	</div>
-</div>
+</Sectional>
 
-<div class="mt-3">
+<Sectional label="Arc Height">
 	<div class="grid grid-cols-2 gap-4">
 		<div>
-			<Label>Arc Height</Label>
 			<input type="range" min="0" max="5" step="0.1" bind:value={arcHeight} class="w-full" />
 			<div class="flex justify-between text-xs text-gray-500">
 				<span>Flat</span>
@@ -337,7 +313,6 @@
 			</div>
 		</div>
 		<div>
-			<Label>Height Multiplier</Label>
 			<input
 				type="range"
 				min="0.1"
@@ -352,45 +327,33 @@
 			</div>
 		</div>
 	</div>
-</div>
+</Sectional>
 
-{#if widthColumn}
-	<div class="mt-3">
-		<Label>Width Range</Label>
+<Sectional label="Width Range">
+	{#if widthColumn}
 		<div class="grid grid-cols-2 gap-4">
 			<div>
-				<Label>Min Width</Label>
 				<input type="range" min="0.5" max="5" step="0.5" bind:value={minArcWidth} class="w-full" />
 			</div>
 			<div>
-				<Label>Max Width</Label>
 				<input type="range" min="5" max="50" step="1" bind:value={maxArcWidth} class="w-full" />
 			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+</Sectional>
 
-<div class="mt-3">
-	<div>
-		<div class="grid grid-cols-2 gap-4">
-			<div>
-				<Label>Label Column (Optional)</Label>
-				<ColumnDropdown bind:chosenColumn={labelColumn} />
-			</div>
-			<div class="flex h-full items-center">
-				<label class="flex items-center">
-					<input
-						type="checkbox"
-						bind:checked={showLabels}
-						class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-						disabled={!labelColumn}
-					/>
-					<span class="ml-2 text-sm text-gray-700">Show Labels</span>
-				</label>
-			</div>
+<Sectional label="Label Settings">
+	{#if labelColumn}
+		<div class="flex items-center">
+			<input
+				type="checkbox"
+				bind:checked={showLabels}
+				class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+			/>
+			<span class="ml-2 text-sm text-gray-700">Show Labels</span>
 		</div>
-	</div>
-</div>
+	{/if}
+</Sectional>
 
 {#if !requiredColumnsSelected}
 	<div class="mt-2 text-amber-500">

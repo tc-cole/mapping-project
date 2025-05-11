@@ -35,25 +35,29 @@
 </script>
 
 <Sidebar.Group>
-	<Sidebar.GroupLabel
-		>Datasets
-		<Sidebar.GroupAction>
-			<Dialog.Root>
-				<Dialog.Trigger>
-					<Plus />
-					<span class="sr-only">Add Project</span>
-				</Dialog.Trigger>
-				<Dialog.Content>
-					<Dialog.Header>
-						<Dialog.Title>Are you sure absolutely sure?</Dialog.Title>
-						<Dialog.Description>
-							This action cannot be undone. This will permanently delete your account and remove
-							your data from our servers.
-						</Dialog.Description>
-					</Dialog.Header>
-					<Dropzone on:drop={handleFilesSelect} />
-				</Dialog.Content>
-			</Dialog.Root>
-		</Sidebar.GroupAction>
+	<Sidebar.GroupLabel>
+		<div class="flex flex-row">
+			Datasets
+			<Sidebar.GroupAction>
+				<Dialog.Root>
+					<Dialog.Trigger>
+						{#snippet child({ props })}
+							<Plus {...props} />
+							<span class="sr-only">Add Project</span>
+						{/snippet}
+					</Dialog.Trigger>
+					<Dialog.Content>
+						<Dialog.Header>
+							<Dialog.Title>Are you sure absolutely sure?</Dialog.Title>
+							<Dialog.Description>
+								This action cannot be undone. This will permanently delete your account and remove
+								your data from our servers.
+							</Dialog.Description>
+						</Dialog.Header>
+						<Dropzone ondrop={handleFilesSelect} />
+					</Dialog.Content>
+				</Dialog.Root>
+			</Sidebar.GroupAction>
+		</div>
 	</Sidebar.GroupLabel>
 </Sidebar.Group>

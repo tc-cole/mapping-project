@@ -4,10 +4,17 @@
 		layerDefs,
 		type DeckLayerEntry
 	} from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
+
+	//import SidebarMenuItem from '$lib/components/ui/sidebar/sidebar-menu-item.svelte';
+	import SidebarMenuSubButton from '$lib/components/ui/sidebar/sidebar-menu-sub-button.svelte';
+	import SidebarMenuSubItem from '$lib/components/ui/sidebar/sidebar-menu-sub-item.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import LayerConfiguration from './layer-configuration.svelte';
+	import { ChevronRight } from '@lucide/svelte';
+	import { buttonVariants } from '$lib/components/ui/button';
 
-	let { layer, layertype = $bindable() }: { layer: DeckLayerEntry; layertype: string } = $props();
-
+	let { layer }: { layer: DeckLayerEntry } = $props();
 	let selectedLabel = $state('Choose Type');
 
 	$effect(() => {
@@ -22,18 +29,40 @@
 	}
 </script>
 
-<DropdownMenu.Root>
-	<DropdownMenu.Trigger class="w-full rounded border px-2 py-1 text-left">
-		{selectedLabel}
-	</DropdownMenu.Trigger>
-
-	<DropdownMenu.Content class="w-40">
-		<DropdownMenu.Group>
-			{#each Object.entries(layerDefs) as [key, def]}
-				<DropdownMenu.Item onclick={() => chooseType(key)}>
-					{def.label}
-				</DropdownMenu.Item>
-			{/each}
-		</DropdownMenu.Group>
-	</DropdownMenu.Content>
-</DropdownMenu.Root>
+<SidebarMenuSubItem>
+	<Collapsible.Root class="group/collapsible" open={true}>
+		<Collapsible.Trigger>
+			{#snippet child({ props })}
+				<SidebarMenuSubButton {...props} class={buttonVariants({ variant: 'secondary' })}>
+					Configure Layer
+					<ChevronRight
+						class="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90"
+					/>
+				</SidebarMenuSubButton>
+			{/snippet}
+		</Collapsible.Trigger>
+		<Collapsible.Content class="my-3">
+			<DropdownMenu.Root>
+				<SidebarMenuSubButton>
+					{#snippet child({ props })}
+						<DropdownMenu.Trigger {...props} class={buttonVariants({ variant: 'secondary' })}>
+							{selectedLabel}
+						</DropdownMenu.Trigger>
+					{/snippet}
+				</SidebarMenuSubButton>
+				<DropdownMenu.Content class="w-40">
+					<DropdownMenu.Group>
+						{#each Object.entries(layerDefs) as [key, def]}
+							<DropdownMenu.Item onclick={(e) => chooseType(key)}>
+								{def.label}
+							</DropdownMenu.Item>
+						{/each}
+					</DropdownMenu.Group>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			<div class="my-3">
+				<LayerConfiguration layertype={selectedLabel} {layer} />
+			</div>
+		</Collapsible.Content>
+	</Collapsible.Root>
+</SidebarMenuSubItem>

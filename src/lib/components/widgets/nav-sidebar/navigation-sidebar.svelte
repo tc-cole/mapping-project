@@ -15,13 +15,19 @@
 <Sidebar.Root>
 	<Sidebar.Content>
 		<AddDataset />
-		<Button onclick={addLayer}>
-			<span>Add Layer </span>
-			<Plus />
-		</Button>
-		{#each $layers as layer}
-			<SidebarLayerEditor {layer} />
-		{/each}
+		<Sidebar.Group class="-px-4">
+			<Button onclick={addLayer}>
+				<span>Add Layer </span>
+				<Plus />
+			</Button>
+		</Sidebar.Group>
+		<Sidebar.Group class="-px-4">
+			<Sidebar.Menu>
+				{#each $layers as layer}
+					<SidebarLayerEditor {layer} />
+				{/each}
+			</Sidebar.Menu>
+		</Sidebar.Group>
 		<!--
 		<Collapsible.Root open={true} class="group/collapsible">
 			<Sidebar.Group>

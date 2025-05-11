@@ -5,6 +5,7 @@
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import Sectional from './utils/sectional.svelte';
 
 	const CHUNK_SIZE = 100000;
 
@@ -142,101 +143,72 @@
 	};
 </script>
 
-<div class="grid grid-cols-2 gap-2">
-	<div>
-		<Label>H3 Index Column</Label>
-		<ColumnDropdown bind:chosenColumn={h3Column} />
-	</div>
-	<div>
-		<Label>Value Column</Label>
-		<ColumnDropdown bind:chosenColumn={valueColumn} />
-	</div>
-</div>
+<Sectional label="Column Selection">
+	<ColumnDropdown bind:chosenColumn={h3Column} default_column="H3" />
+	<ColumnDropdown bind:chosenColumn={valueColumn} default_column="Value" />
+</Sectional>
 
-<div class="mt-3">
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<Label>Color Scale</Label>
-			<select
-				class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-				bind:value={colorScale}
-			>
-				{#each colorScales as scale}
-					<option value={scale}>{scale}</option>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<Label>Scale Type</Label>
-			<select
-				class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-				bind:value={scaleType}
-			>
-				{#each scaleTypes as type}
-					<option value={type}>{type}</option>
-				{/each}
-			</select>
-		</div>
-	</div>
-</div>
+<Sectional label="Color Settings">
+	<select
+		class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+		bind:value={colorScale}
+	>
+		{#each colorScales as scale}
+			<option value={scale}>{scale}</option>
+		{/each}
+	</select>
 
-<div class="mt-3">
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<Label>Opacity</Label>
-			<input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
+	<select
+		class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+		bind:value={scaleType}
+	>
+		{#each scaleTypes as type}
+			<option value={type}>{type}</option>
+		{/each}
+	</select>
+</Sectional>
+
+<Sectional label="Display Settings">
+	<input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
+	<div class="flex justify-between text-xs text-gray-500">
+		<span>Transparent</span>
+		<span>Solid</span>
+	</div>
+
+	<input type="range" min="0.5" max="1" step="0.05" bind:value={coverage} class="w-full" />
+	<div class="flex justify-between text-xs text-gray-500">
+		<span>Small</span>
+		<span>Full</span>
+	</div>
+</Sectional>
+
+<Sectional label="3D Settings">
+	<input
+		type="checkbox"
+		bind:checked={extruded}
+		class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+	/>
+	<span class="ml-2 text-sm text-gray-700">Show 3D Extrusion</span>
+
+	{#if extruded}
+		<div class="mt-3">
+			<input type="range" min="1" max="100" step="1" bind:value={elevationScale} class="w-full" />
 			<div class="flex justify-between text-xs text-gray-500">
-				<span>Transparent</span>
-				<span>Solid</span>
+				<span>Low</span>
+				<span>High</span>
 			</div>
 		</div>
-		<div>
-			<Label>Coverage</Label>
-			<input type="range" min="0.5" max="1" step="0.05" bind:value={coverage} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Small</span>
-				<span>Full</span>
-			</div>
-		</div>
-	</div>
-</div>
+	{/if}
 
-<div class="mt-3">
-	<div>
-		<label class="flex items-center">
-			<input
-				type="checkbox"
-				bind:checked={extruded}
-				class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-			/>
-			<span class="ml-2 text-sm text-gray-700">Show 3D Extrusion</span>
-		</label>
-	</div>
-</div>
-
-{#if extruded}
 	<div class="mt-3">
-		<Label>Elevation Scale</Label>
-		<input type="range" min="1" max="100" step="1" bind:value={elevationScale} class="w-full" />
-		<div class="flex justify-between text-xs text-gray-500">
-			<span>Low</span>
-			<span>High</span>
-		</div>
+		<input
+			type="checkbox"
+			bind:checked={wireframe}
+			class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+		/>
+		<span class="ml-2 text-sm text-gray-700">Show Wireframe</span>
 	</div>
-{/if}
-
-<div class="mt-3">
-	<div>
-		<label class="flex items-center">
-			<input
-				type="checkbox"
-				bind:checked={wireframe}
-				class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-			/>
-			<span class="ml-2 text-sm text-gray-700">Show Wireframe</span>
-		</label>
-	</div>
-</div>
+</Sectional>
 
 {#if !requiredColumnsSelected}
 	<div class="mt-2 text-amber-500">Please select H3 index and value columns to display data.</div>

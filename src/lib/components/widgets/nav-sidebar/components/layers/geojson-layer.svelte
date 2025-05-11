@@ -5,6 +5,7 @@
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import Sectional from './utils/sectional.svelte';
 
 	const CHUNK_SIZE = 100000;
 
@@ -259,113 +260,95 @@
 	};
 </script>
 
-<div class="grid grid-cols-2 gap-2">
-	<div class="col-span-2">
-		<Label>GeoJSON Column</Label>
-		<ColumnDropdown bind:chosenColumn={geojsonColumn} />
-	</div>
-</div>
+<Sectional label="GeoJSON">
+	<ColumnDropdown bind:chosenColumn={geojsonColumn} default_column="GeoJSON" />
+	{#if !requiredColumnsSelected}
+		<div class="mt-2 text-amber-500">Please select a GeoJSON column to display data.</div>
+	{/if}
+</Sectional>
 
-<div class="mt-3 grid grid-cols-2 gap-2">
-	<div>
-		<Label>Color Property (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={colorProperty} />
-	</div>
-	<div>
-		<Label>Scale Type</Label>
-		<select
-			class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-			bind:value={scaleType}
-			disabled={!colorProperty}
-		>
-			{#each scaleTypes as type}
-				<option value={type}>{type}</option>
-			{/each}
-		</select>
-	</div>
-</div>
+{#if requiredColumnsSelected}
+	<Sectional label="Color Configuration">
+		<div class="grid grid-cols-2 gap-2">
+			<ColumnDropdown bind:chosenColumn={colorProperty} default_column="Color" />
 
-{#if colorProperty}
-	<div class="mt-3 grid grid-cols-2 gap-2">
-		<div>
-			<Label>Fill Color Scale</Label>
 			<select
 				class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-				bind:value={fillColorScale}
+				bind:value={scaleType}
+				disabled={!colorProperty}
 			>
-				{#each colorScales as scale}
-					<option value={scale}>{scale}</option>
+				{#each scaleTypes as type}
+					<option value={type}>{type}</option>
 				{/each}
 			</select>
 		</div>
-		<div>
-			<Label>Line Color Scale</Label>
-			<select
-				class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-				bind:value={lineColorScale}
-			>
-				{#each colorScales as scale}
-					<option value={scale}>{scale}</option>
-				{/each}
-			</select>
-		</div>
-	</div>
-{/if}
 
-<div class="mt-3">
-	<div>
-		<label class="flex items-center">
+		{#if colorProperty}
+			<div class="mt-3 grid grid-cols-2 gap-2">
+				<div>
+					<Label>Fill Color Scale</Label>
+					<select
+						class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+						bind:value={fillColorScale}
+					>
+						{#each colorScales as scale}
+							<option value={scale}>{scale}</option>
+						{/each}
+					</select>
+				</div>
+				<div>
+					<Label>Line Color Scale</Label>
+					<select
+						class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+						bind:value={lineColorScale}
+					>
+						{#each colorScales as scale}
+							<option value={scale}>{scale}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+		{/if}
+	</Sectional>
+
+	<Sectional label="3D Extrusion">
+		<Label class="flex items-center">
 			<input
 				type="checkbox"
 				bind:checked={extruded}
 				class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
 			/>
 			<span class="ml-2 text-sm text-gray-700">Show 3D Extrusion</span>
-		</label>
-	</div>
-</div>
+		</Label>
 
-{#if extruded}
-	<div class="mt-3 grid grid-cols-2 gap-2">
-		<div>
-			<Label>Elevation Property</Label>
-			<ColumnDropdown bind:chosenColumn={elevationProperty} />
-		</div>
-		<div>
-			<Label>Elevation Scale</Label>
-			<input type="range" min="1" max="100" step="1" bind:value={elevationScale} class="w-full" />
-		</div>
-	</div>
-{/if}
+		{#if extruded}
+			<div class="mt-3 grid grid-cols-2 gap-2">
+				<ColumnDropdown bind:chosenColumn={elevationProperty} default_column="Elevation" />
+				<input type="range" min="1" max="100" step="1" bind:value={elevationScale} class="w-full" />
+			</div>
+		{/if}
+	</Sectional>
 
-<div class="mt-3 grid grid-cols-2 gap-4">
-	<div>
-		<Label>Line Width</Label>
-		<input type="range" min="0.5" max="5" step="0.5" bind:value={lineWidth} class="w-full" />
-		<div class="flex justify-between text-xs text-gray-500">
-			<span>Thin</span>
-			<span>Thick</span>
+	<Sectional label="Style Settings">
+		<div class="grid grid-cols-2 gap-4">
+			<input type="range" min="0.5" max="5" step="0.5" bind:value={lineWidth} class="w-full" />
+			<div class="flex justify-between text-xs text-gray-500">
+				<span>Thin</span>
+				<span>Thick</span>
+			</div>
+			<input type="range" min="0" max="1" step="0.05" bind:value={fillOpacity} class="w-full" />
+			<div class="flex justify-between text-xs text-gray-500">
+				<span>Transparent</span>
+				<span>Solid</span>
+			</div>
 		</div>
-	</div>
-	<div>
-		<Label>Fill Opacity</Label>
-		<input type="range" min="0" max="1" step="0.05" bind:value={fillOpacity} class="w-full" />
-		<div class="flex justify-between text-xs text-gray-500">
-			<span>Transparent</span>
-			<span>Solid</span>
+
+		<div class="mt-3">
+			<input type="range" min="0" max="1" step="0.05" bind:value={lineOpacity} class="w-full" />
+			<div class="flex justify-between text-xs text-gray-500">
+				<span>Transparent</span>
+				<span>Solid</span>
+			</div>
 		</div>
-	</div>
-</div>
-
-<div class="mt-3">
-	<Label>Line Opacity</Label>
-	<input type="range" min="0" max="1" step="0.05" bind:value={lineOpacity} class="w-full" />
-	<div class="flex justify-between text-xs text-gray-500">
-		<span>Transparent</span>
-		<span>Solid</span>
-	</div>
-</div>
-
-{#if !requiredColumnsSelected}
-	<div class="mt-2 text-amber-500">Please select a GeoJSON column to display data.</div>
+	</Sectional>
 {/if}

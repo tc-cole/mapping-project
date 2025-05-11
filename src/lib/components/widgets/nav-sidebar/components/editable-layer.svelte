@@ -1,24 +1,17 @@
 <script lang="ts">
-	import { layers, layerDefs } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte'; // singleton instance
 	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Sidebar from '$lib/components/ui/sidebar/index';
 
-	import { Trash2, ChevronRight } from '@lucide/svelte';
 	import ChooseLayerType from './choose-layer-type.svelte';
-	import ColumnDropdown from './layers/utils/column-dropdown.svelte';
 	import ChooseDataset from './choose-dataset.svelte';
 
-	import ScatterLayer from './layers/scatter-layer.svelte';
-	import PolygonLayer from './layers/polygon-layer.svelte';
-	import TripsLayer from './layers/trips-layer.svelte';
-	import LineLayer from './layers/line-layer.svelte';
-	import ArcLayer from './layers/arc-layer.svelte';
-	import H3Layer from './layers/h3-layer.svelte';
-	import EditableGeoJsonLayer from './layers/editable-geojson-layer.svelte';
+	import { layers, layerDefs } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte'; // singleton instance
+	import { X, ChevronDown } from '@lucide/svelte';
+	import { MenuItem } from 'svelte-ux';
+	import { buttonVariants } from '$lib/components/ui/button';
 
-	let { layer } = $props();
-
-	// Initialize layertype based on the layer's constructor
 	let layertype = $state('');
+	let { layer } = $props();
 
 	$effect(() => {
 		const match = Object.values(layerDefs).find((d) => d.ctor === layer.ctor);
@@ -27,56 +20,33 @@
 		}
 	});
 
-	$effect(() => {
-		console.log('Current layer type:', layertype);
-	});
-
-	const update = (patch: any) => layers.updateProps(layer.id, patch);
 	const remove = () => layers.remove(layer.id);
 </script>
 
 <Collapsible.Root>
 	<Collapsible.Trigger class="flex w-full items-center gap-2 px-4 py-3 hover:bg-muted/50">
-		<ChevronRight class="transition-transform" size={16} />
+		{#snippet child({ props })}
+			<Sidebar.MenuButton {...props} class={buttonVariants({ variant: 'secondary' })}>
+				<span class="flex-1 truncate">Layer</span>
 
-		<span class="flex-1 truncate">Layer</span>
-
-		<!--<Switch checked={layer.props.visible ?? true} onchange={(e) => update({ visible: e.detail })} /> -->
-		<button class="p-1 text-muted-foreground hover:text-destructive" onclick={remove}>
-			<Trash2 size={16} />
-		</button>
+				<!--<Switch checked={layer.props.visible ?? true} onchange={(e) => update({ visible: e.detail })} /> -->
+				<button class="p-1 text-muted-foreground hover:text-destructive" onclick={remove}>
+					<X size={16} />
+				</button>
+				<ChevronDown
+					class="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180"
+				/>
+			</Sidebar.MenuButton>
+		{/snippet}
 	</Collapsible.Trigger>
 
 	<!-- body -->
-	<Collapsible.Content class="space-y-4 px-4 pb-4">
-		<ChooseLayerType {layer} bind:layertype />
-		{#if layertype === layerDefs.arc.label}
-			<ArcLayer {layer} />
-		{:else if layertype === layerDefs.h3.label}
-			<H3Layer {layer} />
-		{:else if layertype === layerDefs.line.label}
-			<LineLayer {layer} />
-		{:else if layertype === layerDefs.polygon.label}
-			<PolygonLayer {layer} />
-		{:else if layertype === layerDefs.scatter.label}
-			<ScatterLayer {layer} />
-			<!--
-		{:else if layertype === layerDefs.trips.label}
-			<TripsLayer {layer} />
-			-->
-		{:else if layertype === 'GeoJSON'}
-			<EditableGeoJsonLayer {layer} />
-		{/if}
-		<ChooseDataset />
-
-		<div class="flex items-center justify-between">
-			<input
-				type="range"
-				min="0"
-				max="1"
-				step="0.05"
-				oninput={(e: any) => update({ opacity: +e.target.value })}
-			/>
-		</div>
+	<Collapsible.Content class="space-y-4 px-2 pb-4">
+		<Sidebar.MenuItem class="py-2">
+			<ChooseDataset />
+		</Sidebar.MenuItem>
+		<Sidebar.MenuItem>
+			<ChooseLayerType {layer} />
+		</Sidebar.MenuItem>
 	</Collapsible.Content>
 </Collapsible.Root>

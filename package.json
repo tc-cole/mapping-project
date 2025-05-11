@@ -1,5 +1,5 @@
 {
-	"name": "test-project",
+	"name": "mapping",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -14,12 +14,12 @@
 		"lint": "prettier --check ."
 	},
 	"devDependencies": {
-		"@lucide/svelte": "^0.507.0",
+		"@lucide/svelte": "^0.509.0",
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@sveltejs/kit": "^2.16.0",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"autoprefixer": "^10.4.20",
-		"bits-ui": "^1.4.6",
+		"bits-ui": "^1.4.7",
 		"clsx": "^2.1.1",
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
@@ -42,8 +42,6 @@
 		"@deck.gl/mapbox": "^9.1.11",
 		"@duckdb/duckdb-wasm": "^1.29.1-dev132.0",
 		"@duckdb/node-api": "^1.2.2-alpha.18",
-		"@nebula.gl/layers": "^1.0.4",
-		"@nebula.gl/overlays": "^1.0.4",
 		"@tailwindcss/postcss": "^4.1.4",
 		"@tailwindcss/vite": "^4.1.4",
 		"@types/d3": "^7.4.3",
@@ -59,9 +57,7 @@
 		"layerchart": "^1.0.10",
 		"lucide": "^0.503.0",
 		"mapbox-gl": "^3.11.1",
-		"math.gl": "^4.1.0",
 		"mode-watcher": "0.5.1",
-		"nebula.gl": "^1.0.4",
 		"sql-highlight": "^6.0.0",
 		"svelte-ux": "^1.0.4"
 	}

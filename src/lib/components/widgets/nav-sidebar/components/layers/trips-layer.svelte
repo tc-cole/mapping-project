@@ -162,18 +162,18 @@
 	});
 </script>
 
-<div class="grid grid-cols-2 gap-2">
+<div>
 	<div>
-		<ColumnDropdown bind:chosenColumn={fromLatitude} />
+		<ColumnDropdown bind:chosenColumn={fromLatitude} default_column="Starting Latitude" />
 	</div>
 	<div>
-		<ColumnDropdown bind:chosenColumn={fromLongitude} />
+		<ColumnDropdown bind:chosenColumn={fromLongitude} default_column="Starting Longitude" />
 	</div>
 	<div>
-		<ColumnDropdown bind:chosenColumn={toLatitude} />
+		<ColumnDropdown bind:chosenColumn={toLatitude} default_column="Destination Latitude" />
 	</div>
 	<div>
-		<ColumnDropdown bind:chosenColumn={toLongitude} />
+		<ColumnDropdown bind:chosenColumn={toLongitude} default_column="Destination Longitude" />
 	</div>
 </div>
 
@@ -181,10 +181,10 @@
 	<div class="grid grid-cols-2 gap-2">
 		{#if timestampColumn && weightColumn}
 			<div>
-				<ColumnDropdown bind:chosenColumn={timestampColumn} />
+				<ColumnDropdown bind:chosenColumn={timestampColumn} default_column="Timestamp" />
 			</div>
 			<div>
-				<ColumnDropdown bind:chosenColumn={weightColumn} />
+				<ColumnDropdown bind:chosenColumn={weightColumn} default_column="Weight" />
 			</div>
 		{/if}
 	</div>

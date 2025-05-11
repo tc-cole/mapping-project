@@ -5,6 +5,7 @@
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import Sectional from './utils/sectional.svelte';
 
 	const CHUNK_SIZE = 100000;
 
@@ -209,74 +210,64 @@
 	};
 </script>
 
-<div class="grid grid-cols-2 gap-2">
-	<div>
-		<Label>Polygon Column</Label>
-		<ColumnDropdown bind:chosenColumn={polygonColumn} />
-	</div>
-	<div>
-		<Label>ID Column</Label>
-		<ColumnDropdown bind:chosenColumn={idColumn} />
-	</div>
-</div>
+<Sectional label="Required Columns">
+	<ColumnDropdown bind:chosenColumn={polygonColumn} default_column="Polygon" />
+	<ColumnDropdown bind:chosenColumn={idColumn} default_column="ID" />
+</Sectional>
 
-<div class="mt-3 grid grid-cols-2 gap-2">
-	<div>
-		<Label>Color Column (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={colorColumn} />
-	</div>
-	<div>
-		<Label>Label Column (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={labelColumn} />
-	</div>
-</div>
+<Sectional label="Optional Columns">
+	<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" />
+	<ColumnDropdown bind:chosenColumn={labelColumn} default_column="Label" />
+</Sectional>
 
-{#if colorColumn}
-	<div class="mt-2">
-		<Label>Color Scale</Label>
-		<select
-			class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-			bind:value={colorScale}
-		>
-			{#each colorScales as scale}
-				<option value={scale}>{scale}</option>
-			{/each}
-		</select>
-	</div>
-{/if}
-
-<div class="mt-3">
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<Label>Fill Opacity</Label>
-			<input type="range" min="0.1" max="1" step="0.05" bind:value={fillOpacity} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Transparent</span>
-				<span>Solid</span>
-			</div>
+<Sectional label="Color Settings">
+	{#if colorColumn}
+		<div class="mt-2">
+			<Label>Color Scale</Label>
+			<select
+				class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+				bind:value={colorScale}
+			>
+				{#each colorScales as scale}
+					<option value={scale}>{scale}</option>
+				{/each}
+			</select>
 		</div>
-		<div>
-			<Label>Line Width</Label>
-			<input type="range" min="0" max="3" step="0.5" bind:value={lineWidth} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>None</span>
-				<span>Thick</span>
-			</div>
+	{/if}
+</Sectional>
+
+<Sectional label="Display Settings">
+	<div>
+		<Label>Fill Opacity</Label>
+		<input type="range" min="0.1" max="1" step="0.05" bind:value={fillOpacity} class="w-full" />
+		<div class="flex justify-between text-xs text-gray-500">
+			<span>Transparent</span>
+			<span>Solid</span>
 		</div>
 	</div>
-</div>
-
-{#if labelColumn}
-	<div class="mt-3 flex items-center">
-		<input
-			type="checkbox"
-			bind:checked={showLabels}
-			id="show-labels"
-			class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-		/>
-		<label for="show-labels" class="ml-2 text-sm text-gray-700">Show Labels</label>
+	<div>
+		<Label>Line Width</Label>
+		<input type="range" min="0" max="3" step="0.5" bind:value={lineWidth} class="w-full" />
+		<div class="flex justify-between text-xs text-gray-500">
+			<span>None</span>
+			<span>Thick</span>
+		</div>
 	</div>
-{/if}
+</Sectional>
+
+<Sectional label="Label Settings">
+	{#if labelColumn}
+		<div class="flex items-center">
+			<input
+				type="checkbox"
+				bind:checked={showLabels}
+				id="show-labels"
+				class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+			/>
+			<label for="show-labels" class="ml-2 text-sm text-gray-700">Show Labels</label>
+		</div>
+	{/if}
+</Sectional>
 
 {#if !requiredColumnsSelected}
 	<div class="mt-2 text-amber-500">Please select polygon and ID columns to display data.</div>

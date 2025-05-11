@@ -1,10 +1,14 @@
 <script lang="ts">
-	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { layers } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
-	import ColumnDropdown from './utils/column-dropdown.svelte';
+	import { chosenDataset } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import Input from '$lib/components/ui/input/input.svelte';
+	//import * as Card from '$lib/components/ui/card/index.js';
+	//import Separator from '$lib/components/ui/separator/separator.svelte';
+	import ColumnDropdown from './utils/column-dropdown.svelte';
+	import Sectional from './utils/sectional.svelte';
 
 	const CHUNK_SIZE = 100000;
 
@@ -217,95 +221,103 @@
 	};
 </script>
 
-<div class="grid grid-cols-2 gap-2">
-	<div>
-		<Label>Latitude Column</Label>
-		<ColumnDropdown bind:chosenColumn={latitudeColumn} />
-	</div>
-	<div>
-		<Label>Longitude Column</Label>
-		<ColumnDropdown bind:chosenColumn={longitudeColumn} />
-	</div>
-</div>
-
-<div class="mt-3 grid grid-cols-2 gap-2">
-	<div>
-		<Label>Size Column (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={sizeColumn} />
-	</div>
-	<div>
-		<Label>Color Column (Optional)</Label>
-		<ColumnDropdown bind:chosenColumn={colorColumn} />
-	</div>
-</div>
-
-{#if colorColumn}
-	<div class="mt-2">
-		<Label>Color Scale</Label>
-		<select
-			class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-			bind:value={colorScale}
-		>
-			{#each colorScales as scale}
-				<option value={scale}>{scale}</option>
-			{/each}
-		</select>
-	</div>
-{/if}
-
-<div class="mt-3">
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<Label>Point Size</Label>
-			<input type="range" min="1" max="50" step="1" bind:value={pointRadius} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Small</span>
-				<span>Large</span>
-			</div>
+<!-- Required Coordinates -->
+<div class="mb-4">
+	<Sectional label="Choose Latitude and Longitude Columns">
+		<div class="py-1">
+			<ColumnDropdown bind:chosenColumn={latitudeColumn} default_column={'Latitude'} />
+		</div>
+		<div class="py-1">
+			<ColumnDropdown bind:chosenColumn={longitudeColumn} default_column={'Longitude'} />
 		</div>
 		<div>
-			<Label>Opacity</Label>
-			<input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Transparent</span>
-				<span>Solid</span>
-			</div>
+			{#if !requiredColumnsSelected}
+				<p class="text-sm text-amber-500">Please select both columns to display points.</p>
+			{/if}
 		</div>
-	</div>
+	</Sectional>
 </div>
 
-{#if sizeColumn}
-	<div class="mt-3">
-		<Label>Size Range</Label>
-		<div class="grid grid-cols-2 gap-4">
+<!-- Optional Encodings -->
+<div class="mb-4">
+	<Sectional label="Optional Columns">
+		<div class="space-y-4">
+			<ColumnDropdown bind:chosenColumn={sizeColumn} default_column="Size" />
+			<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" />
+
+			{#if colorColumn}
+				<div class="mt-2 space-y-1">
+					<select
+						class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+						bind:value={colorScale}
+					>
+						{#each colorScales as scale}
+							<option value={scale}>{scale}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+
+			{#if sizeColumn}
+				<div class="mt-2 space-y-2">
+					<div>
+						<Label>Min Radius</Label>
+						<Input
+							type="range"
+							min="1"
+							max="50"
+							step="1"
+							bind:value={minPointRadius}
+							class="w-full"
+						/>
+					</div>
+					<div>
+						<Label>Max Radius</Label>
+						<Input
+							type="range"
+							min="10"
+							max="200"
+							step="5"
+							bind:value={maxPointRadius}
+							class="w-full"
+						/>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</Sectional>
+</div>
+
+<div class="mb-4">
+	<Sectional label="Visual Adjustments">
+		<div class="space-y-4">
 			<div>
-				<Label>Min Radius</Label>
-				<input type="range" min="1" max="50" step="1" bind:value={minPointRadius} class="w-full" />
+				<Input type="range" min="1" max="50" step="1" bind:value={pointRadius} class="w-full" />
+				<div class="flex justify-between text-xs text-gray-500">
+					<span>Small</span>
+					<span>Large</span>
+				</div>
 			</div>
 			<div>
-				<Label>Max Radius</Label>
-				<input
-					type="range"
-					min="10"
-					max="200"
-					step="5"
-					bind:value={maxPointRadius}
-					class="w-full"
-				/>
+				<Input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
+				<div class="flex justify-between text-xs text-gray-500">
+					<span>Transparent</span>
+					<span>Solid</span>
+				</div>
 			</div>
 		</div>
-	</div>
-{/if}
+	</Sectional>
+</div>
 
-<div class="mt-3">
-	<div>
-		<div class="grid grid-cols-2 gap-4">
-			<div>
-				<Label>Label Column (Optional)</Label>
-				<ColumnDropdown bind:chosenColumn={labelColumn} />
-			</div>
-			<div class="flex h-full items-center">
-				<label class="flex items-center">
+<!-- Labels -->
+<div class="mb-4">
+	<Sectional label="Point Labels">
+		<div class="space-y-2">
+			<div class="grid grid-cols-2 items-center gap-4">
+				<div>
+					<ColumnDropdown bind:chosenColumn={labelColumn} default_column="Label" />
+				</div>
+				<div class="flex items-center">
 					<input
 						type="checkbox"
 						bind:checked={showLabels}
@@ -313,14 +325,8 @@
 						disabled={!labelColumn}
 					/>
 					<span class="ml-2 text-sm text-gray-700">Show Labels</span>
-				</label>
+				</div>
 			</div>
 		</div>
-	</div>
+	</Sectional>
 </div>
-
-{#if !requiredColumnsSelected}
-	<div class="mt-2 text-amber-500">
-		Please select latitude and longitude columns to display points.
-	</div>
-{/if}
