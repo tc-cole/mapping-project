@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { layers as layerStore } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import {
+		layers as layerStore,
+		mapViewState
+	} from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
 
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { Deck } from '@deck.gl/core';
 	import mapboxgl from 'mapbox-gl';
 
@@ -11,7 +14,7 @@
 	let map: mapboxgl.Map;
 	let container: HTMLElement;
 
-	let INITIAL_VIEW_STATE = {
+	const initialViewState = {
 		longitude: -74,
 		latitude: 40.7,
 		zoom: 4,
@@ -22,29 +25,28 @@
 
 	$effect(() => {
 		const updatedLayers = $layerStore
-			.filter((e) => e.ctor)
+			.filter((e) => e.ctor) //@ts-ignore
 			.map((e) => new e.ctor({ id: e.id, ...e.props }));
-		//1;
-		console.log(updatedLayers);
-		if (updatedLayers.length > 0) deckInstance.setProps({ layers: updatedLayers });
+		if (updatedLayers.length > 0 && deckInstance)
+			deckInstance.setProps({ layers: updatedLayers, viewState: $mapViewState });
 	});
 
-	onMount(() => {
-		var id = 'base-map';
-
+	$effect(() => {
 		map = new mapboxgl.Map({
 			container: container,
 			style: 'mapbox://styles/mapbox/navigation-night-v1',
-			...INITIAL_VIEW_STATE
+			...initialViewState,
+			interactive: true // Disable map interactions - Deck.gl will handle them
 		});
 
 		deckInstance = new Deck({
 			canvas: 'deck-canvas',
 			width: '100%',
 			height: '100%',
-			initialViewState: INITIAL_VIEW_STATE,
+			initialViewState: initialViewState,
 			controller: true,
 			onViewStateChange: ({ viewState }) => {
+				mapViewState.set(viewState);
 				map.jumpTo({
 					center: [viewState.longitude, viewState.latitude],
 					zoom: viewState.zoom,

@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { layers } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import { layers, mapViewState } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { chosenDataset } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';
-	//import * as Card from '$lib/components/ui/card/index.js';
-	//import Separator from '$lib/components/ui/separator/separator.svelte';
+	import { flyTo } from './utils/flyto';
+
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 
@@ -59,7 +59,6 @@
 		if (requiredColumnsSelected && !hasInitialized) {
 			updateMapLayers();
 			hasInitialized = true;
-			console.log($layers);
 		}
 	});
 
@@ -214,7 +213,13 @@
 			if (labelColumn) columns.push(labelColumn);
 
 			const columnsStr = columns.join(', ');
+			const data = await client.query(`SELECT ${columnsStr} FROM ${filename} LIMIT 1`);
 
+			//@ts-ignore-error
+			const viewingPosition = data[0];
+			//@ts-ignore-error
+			flyTo(viewingPosition.longitude, viewingPosition.latitude);
+			//mapViewState.set(viewingPosition);
 			const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
 			yield* transformRows(stream.readRows());
 		}

@@ -547,6 +547,20 @@ async function insertUntypedCsv(
 	}
 }
 
+async function addExtensions(db: AsyncDuckDB, extension: string): Promise<void> {
+	try {
+		const conn = await db.connect();
+		await conn.query(`
+			INSTALL ${extension};
+			LOAD ${extension};
+			`);
+	} catch (error) {
+		throw new Error(
+			`Failed to Install or Load extension ${extension}: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+}
+
 async function registerUrl(db: AsyncDuckDB, url: string, name?: string): Promise<void> {
 	try {
 		const filename = url.split('/').pop()!;
@@ -727,6 +741,7 @@ export const DuckDBUtils = {
 		return String(value);
 	}
 };
+
 export class SingletonDatabase {
 	/* 🟢 1) ——— singleton handle ——— */
 	private static _instance: SingletonDatabase | null = null;
@@ -770,6 +785,19 @@ export class SingletonDatabase {
 		await SingletonDatabase._instance?.client?.close(); // tidy up old client
 		SingletonDatabase._instance = new SingletonDatabase(opts);
 		return SingletonDatabase._instance;
+	}
+
+	async addExtension(extension: string): Promise<void> {
+		try {
+			await this.client?.query(`
+				INSTALL ${extension};
+				LOAD ${extension};
+				`);
+		} catch (error) {
+			throw new Error(
+				`Failed to Install or Load extension ${extension}: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
 	}
 }
 

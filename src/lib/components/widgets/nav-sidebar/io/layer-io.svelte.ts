@@ -1,6 +1,6 @@
 // src/lib/deck/LayerStore.ts
 import { writable, get, type Writable } from 'svelte/store';
-import { Layer } from '@deck.gl/core';
+import { Layer, type MapViewState } from '@deck.gl/core';
 import { storeFromLocalStorage } from '$lib/components/io/storage';
 import {
 	ScatterplotLayer,
@@ -389,3 +389,11 @@ export const LayerFactory = {
 		} as unknown as DeckLayerEntry;
 	}
 };
+export const mapViewState = writable<MapViewState>({
+	longitude: -74,
+	latitude: 40.7,
+	zoom: 4,
+	maxZoom: 16,
+	pitch: 0,
+	bearing: 0
+});
