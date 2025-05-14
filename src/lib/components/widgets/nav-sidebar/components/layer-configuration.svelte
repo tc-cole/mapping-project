@@ -6,7 +6,7 @@
 	import ArcLayer from './layers/arc-layer.svelte';
 	import H3Layer from './layers/h3-layer.svelte';
 	import EditableGeoJsonLayer from './layers/editable-geojson-layer.svelte';
-	import { layerDefs } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte'; // singleton instance
+	import { layerDefs } from '$lib/components/maps/layer-io.svelte'; // singleton instance
 
 	let { layertype, layer } = $props();
 </script>

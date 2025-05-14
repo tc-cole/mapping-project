@@ -238,7 +238,7 @@ function slug(base: string) {
 /* Singleton convenience export                                               */
 /* -------------------------------------------------------------------------- */
 
-export const layers = LayerStore.fromStorage('deck_layers', { historySize: 20 });
+export const layers = new LayerStore();
 
 export const layerDefs: Record<LayerType, LayerDef> = {
 	scatter: {
@@ -389,6 +389,7 @@ export const LayerFactory = {
 		} as unknown as DeckLayerEntry;
 	}
 };
+
 export const mapViewState = writable<MapViewState>({
 	longitude: -74,
 	latitude: 40.7,

@@ -1,8 +1,5 @@
 <script lang="ts">
-	import {
-		layers as layerStore,
-		mapViewState
-	} from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import { layers as layerStore, mapViewState } from '$lib/components/maps/layer-io.svelte';
 
 	import { onDestroy } from 'svelte';
 	import { Deck } from '@deck.gl/core';

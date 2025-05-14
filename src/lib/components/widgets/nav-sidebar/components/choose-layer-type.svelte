@@ -1,9 +1,5 @@
 <script lang="ts">
-	import {
-		layers,
-		layerDefs,
-		type DeckLayerEntry
-	} from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import { layers, layerDefs, type DeckLayerEntry } from '$lib/components/maps/layer-io.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
 
 	//import SidebarMenuItem from '$lib/components/ui/sidebar/sidebar-menu-item.svelte';

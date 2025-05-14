@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { layers } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import { layers } from '$lib/components/maps/layer-io.svelte';
 	import { chosenDataset } from '$lib/components/io/stores';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';

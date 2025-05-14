@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { layers, mapViewState } from '$lib/components/widgets/nav-sidebar/io/layer-io.svelte';
+	import { layers, mapViewState } from '$lib/components/maps/layer-io.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { chosenDataset } from '$lib/components/io/stores';
@@ -9,6 +9,30 @@
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
+
+	import { ScatterplotLayer } from '@deck.gl/layers';
+
+	type BartStation = {
+		name: string;
+		passengers: number;
+		coordinates: [longitude: number, latitude: number];
+	};
+
+	const l = new ScatterplotLayer<BartStation>({
+		id: 'bart-stations',
+		data: [
+			{ name: 'Colma', passengers: 4214, coordinates: [-122.466233, 37.684638] },
+			{ name: 'Civic Center', passengers: 24798, coordinates: [-122.413756, 37.779528] }
+			// ...
+		],
+		stroked: false,
+		filled: true,
+		getPosition: (d: BartStation) => d.coordinates,
+		getRadius: (d: BartStation) => Math.sqrt(d.passengers),
+		getFillColor: [255, 200, 0]
+	});
+
+	//console.log([l]);
 
 	const CHUNK_SIZE = 100000;
 
