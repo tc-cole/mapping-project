@@ -140,12 +140,4 @@
 			</Sidebar.GroupAction>
 		</div>
 	</Sidebar.GroupLabel>
-
-	<!-- This would display your uploaded datasets -->
-	<!--{#each $fileUploadStore as dataset}
-		<SidebarMenuItem>
-			{dataset.filename}
-		</SidebarMenuItem>
-	{/each}
--->
 </Sidebar.Group>

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { LayerFactory, layers } from '$lib/components/io/layer-io.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
+	import { LayerFactory, layers } from '$lib/components/io/layer-io.svelte';
 	import { chosenDataset } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';

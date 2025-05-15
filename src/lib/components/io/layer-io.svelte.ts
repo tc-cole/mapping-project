@@ -11,7 +11,6 @@ import {
 	PolygonLayer
 } from '@deck.gl/layers';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
-//import { TripsLayer } from 'deck.gl';
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -91,6 +90,7 @@ export class LayerStore {
 	}
 
 	add(entry: Omit<DeckLayerEntry, 'id'> & { id?: string }) {
+		//	@ts-expect-error
 		const id = entry.id ?? slug(entry.ctor.name);
 		this.ensureUnique(id);
 		const layer: DeckLayerEntry = { ...entry, id };
