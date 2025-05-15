@@ -7,6 +7,8 @@
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { flyTo } from './utils/flyto';
 
+	import { onMount } from 'svelte';
+
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 

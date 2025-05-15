@@ -2,7 +2,7 @@
 	import { mapViewState } from '$lib/components/io/layer-management.svelte';
 	import { layers } from '$lib/components/io/stores';
 
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { Deck } from '@deck.gl/core';
 	import mapboxgl from 'mapbox-gl';
 
@@ -25,11 +25,11 @@
 		const updatedLayers = $layers
 			.filter((e) => e.ctor) //@ts-ignore
 			.map((e) => new e.ctor({ id: e.id, ...e.props }));
-		if (updatedLayers.length > 0 && deckInstance)
+		if ($layers.length > 0 && deckInstance)
 			deckInstance.setProps({ layers: updatedLayers, viewState: $mapViewState });
 	});
 
-	$effect(() => {
+	onMount(() => {
 		map = new mapboxgl.Map({
 			container: container,
 			style: 'mapbox://styles/mapbox/navigation-night-v1',
