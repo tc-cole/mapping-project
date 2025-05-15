@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { layers, layerDefs, type DeckLayerEntry } from '$lib/components/io/layer-io.svelte';
+	import { layerDefs, type DeckLayerEntry } from '$lib/components/io/layer-management.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
+	import { layers } from '$lib/components/io/stores';
 
 	//import SidebarMenuItem from '$lib/components/ui/sidebar/sidebar-menu-item.svelte';
 	import SidebarMenuSubButton from '$lib/components/ui/sidebar/sidebar-menu-sub-button.svelte';
@@ -19,8 +20,9 @@
 			: 'Choose type';
 	});
 
-	function chooseType(key: keyof typeof layerDefs) {
-		layers.switchType(layer.id, key);
+	function chooseType(key: string) {
+		//@ts-expect-error
+		layers.switchType(layer.id, key); //@ts-expect-error
 		selectedLabel = layerDefs[key].label;
 	}
 </script>

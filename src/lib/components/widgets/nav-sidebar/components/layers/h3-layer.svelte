@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { layers } from '$lib/components/io/layer-io.svelte';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+	import { chosenDataset, layers } from '$lib/components/io/stores';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
@@ -19,6 +19,7 @@
 	let hasInitialized = $state(false);
 	let dataLoaded = $state(false);
 	let valueRange = $state<[number, number]>([0, 1]);
+	let currentLayerId = $state<string | null>(null); // Track the current layer ID
 
 	let { layer } = $props();
 
@@ -98,6 +99,7 @@
 
 				// Log the first row of each batch to see the raw format
 				if (batch.length > 0) {
+					console.log('First row in batch (raw):', batch[0]);
 				} else {
 					console.log('Batch is empty');
 				}
@@ -338,7 +340,7 @@
 		}
 	}
 
-	// Enhanced update map layers function with comprehensive debugging
+	// Updated update map layers function to use the add/remove pattern
 	function updateMapLayers() {
 		console.log('==================== UPDATE H3 LAYER ====================');
 		console.log('H3 layer columns selected:', {
@@ -357,88 +359,106 @@
 		});
 
 		try {
-			// Update H3 layer
-			console.log(`Updating H3 layer with ID: ${layer.id}`);
+			// Remove existing layer if it exists
+			if (currentLayerId) {
+				console.log(`Removing previous H3 layer with ID: ${currentLayerId}`);
+				layers.remove(currentLayerId);
+				currentLayerId = null;
+			} else {
+				console.log(`Initial layer creation, no previous layer to remove`);
+			}
 
-			layers.updateProps(layer.id, {
-				data: loadData(),
-				getHexagon: (d: any) => {
-					// Validate hexagon
-					if (!d || !d.hex) {
-						console.warn('Invalid hexagon data:', d);
-						return '0'; // Return a default H3 index
-					}
-					// Occasionally log hexagon indices
-					if (Math.random() < 0.001) {
-						// Log ~0.1% of hexagons
-						console.log(`H3 index: ${d.hex}`);
-					}
-					return d.hex;
-				},
-				getFillColor: (d: any) => {
-					// This will be handled by the layer's color mapping based on getColorValue
-					return [255, 140, 0, Math.floor(opacity * 255)];
-				},
-				getElevation: (d: any) => {
-					if (!extruded) return 0;
+			// Create a new H3 layer using LayerFactory
+			console.log(`Creating new H3 layer`);
 
-					const value = d.value || 0;
-					// Occasionally log elevation values
-					if (Math.random() < 0.001) {
-						// Log ~0.1% of hexagons
-						console.log(`H3 elevation value: ${value}, scaled: ${value * elevationScale}`);
-					}
-					return value;
-				},
-				getColorValue: (d: any) => {
-					const value = d.value;
-					// Occasionally log color values
-					if (Math.random() < 0.001) {
-						// Log ~0.1% of hexagons
-						console.log(`H3 color value: ${value}, range: [${valueRange[0]}, ${valueRange[1]}]`);
-					}
-					return value;
-				},
-				elevationScale: elevationScale,
-				extruded: extruded,
-				wireframe: wireframe,
-				coverage: coverage,
-				colorScale: colorScale,
-				colorScaleType: scaleType,
-				colorDomain: valueRange,
-				opacity: opacity,
-				pickable: true,
-				autoHighlight: true,
-				filled: true,
-				updateTriggers: {
-					getElevation: [elevationScale, extruded, valueRange],
-					getColorValue: [valueColumn, valueRange],
-					getFillColor: [colorScale, opacity]
-				},
-				// Add callbacks for visibility debugging
-				onDataLoad: (info: any) => {
-					console.log('H3 layer data loaded:', {
-						hexagonCount: Array.isArray(info?.data) ? info.data.length : 0,
-						sampleHexagon: Array.isArray(info?.data) && info.data.length > 0 ? info.data[0] : null
-					});
-				},
-				onHover: (info: any) => {
-					if (info && info.object) {
-						// Don't log every hover to avoid console spam
-						if (Math.random() < 0.1) {
-							// Only log ~10% of hovers
-							console.log('H3 hover info:', {
-								hex: info.object.hex,
-								value: info.object.value,
-								x: info.x,
-								y: info.y
-							});
+			const newLayer = LayerFactory.create('h3', {
+				props: {
+					data: loadData(),
+					getHexagon: (d: any) => {
+						// Validate hexagon
+						if (!d || !d.hex) {
+							console.warn('Invalid hexagon data:', d);
+							return '0'; // Return a default H3 index
+						}
+						// Occasionally log hexagon indices
+						if (Math.random() < 0.001) {
+							// Log ~0.1% of hexagons
+							console.log(`H3 index: ${d.hex}`);
+						}
+						return d.hex;
+					},
+					getFillColor: (d: any) => {
+						// This will be handled by the layer's color mapping based on getColorValue
+						return [255, 140, 0, Math.floor(opacity * 255)];
+					},
+					getElevation: (d: any) => {
+						if (!extruded) return 0;
+
+						const value = d.value || 0;
+						// Occasionally log elevation values
+						if (Math.random() < 0.001) {
+							// Log ~0.1% of hexagons
+							console.log(`H3 elevation value: ${value}, scaled: ${value * elevationScale}`);
+						}
+						return value;
+					},
+					getColorValue: (d: any) => {
+						const value = d.value;
+						// Occasionally log color values
+						if (Math.random() < 0.001) {
+							// Log ~0.1% of hexagons
+							console.log(`H3 color value: ${value}, range: [${valueRange[0]}, ${valueRange[1]}]`);
+						}
+						return value;
+					},
+					elevationScale: elevationScale,
+					extruded: extruded,
+					wireframe: wireframe,
+					coverage: coverage,
+					colorScale: colorScale,
+					colorScaleType: scaleType,
+					colorDomain: valueRange,
+					opacity: opacity,
+					pickable: true,
+					autoHighlight: true,
+					filled: true,
+					updateTriggers: {
+						getElevation: [elevationScale, extruded, valueRange],
+						getColorValue: [valueColumn, valueRange],
+						getFillColor: [colorScale, opacity]
+					},
+					// Add callbacks for visibility debugging
+					onDataLoad: (info: any) => {
+						console.log('H3 layer data loaded:', {
+							hexagonCount: Array.isArray(info?.data) ? info.data.length : 0,
+							sampleHexagon: Array.isArray(info?.data) && info.data.length > 0 ? info.data[0] : null
+						});
+					},
+					onHover: (info: any) => {
+						if (info && info.object) {
+							// Don't log every hover to avoid console spam
+							if (Math.random() < 0.1) {
+								// Only log ~10% of hovers
+								console.log('H3 hover info:', {
+									hex: info.object.hex,
+									value: info.object.value,
+									x: info.x,
+									y: info.y
+								});
+							}
 						}
 					}
 				}
 			});
 
-			console.log(`H3 layer updated successfully`);
+			// Store the new layer ID for future updates
+			currentLayerId = newLayer.id;
+
+			// Add the new layer to the map
+			console.log(`Adding new H3 layer with ID: ${newLayer.id}`);
+			layers.add(newLayer);
+
+			console.log(`H3 layer updated successfully using add/remove pattern`);
 			console.log('==================== H3 UPDATE COMPLETE ====================');
 		} catch (error) {
 			console.error('Error updating H3 layer:', error); //@ts-expect-error

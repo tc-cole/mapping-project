@@ -5,17 +5,20 @@
 	import ChooseLayerType from './choose-layer-type.svelte';
 	import ChooseDataset from './choose-dataset.svelte';
 
-	import { layers, layerDefs } from '$lib/components/io/layer-io.svelte'; // singleton instance
+	import { layers } from '$lib/components/io/stores';
+	import { layerDefs } from '$lib/components/io/layer-management.svelte'; // singleton instance
 	import { X, ChevronDown } from '@lucide/svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 
-	let layertype = $state('');
+	let layertype = $state('Layer');
 	let { layer } = $props();
 
 	$effect(() => {
 		const match = Object.values(layerDefs).find((d) => d.ctor === layer.ctor);
 		if (match) {
-			layertype = match.label;
+			layertype = match.label + ' Layer';
+		} else {
+			layertype = 'Layer';
 		}
 	});
 
@@ -26,7 +29,7 @@
 	<Collapsible.Trigger class="flex w-full items-center gap-2 px-4 py-3 hover:bg-muted/50">
 		{#snippet child({ props })}
 			<Sidebar.MenuButton {...props} class={buttonVariants({ variant: 'secondary' })}>
-				<span class="flex-1 truncate">Layer</span>
+				<span class="flex-1 truncate">{layertype}</span>
 
 				<!--<Switch checked={layer.props.visible ?? true} onchange={(e) => update({ visible: e.detail })} /> -->
 				<button class="p-1 text-muted-foreground hover:text-destructive" onclick={remove}>
@@ -40,7 +43,7 @@
 	</Collapsible.Trigger>
 
 	<!-- body -->
-	<Collapsible.Content class="space-y-4 px-2 pb-4">
+	<Collapsible.Content class="px-2 pb-4">
 		<Sidebar.MenuItem class="py-2">
 			<ChooseDataset />
 		</Sidebar.MenuItem>

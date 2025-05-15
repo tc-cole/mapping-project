@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { layers } from '$lib/components/io/layer-io.svelte';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { chosenDataset, layers } from '$lib/components/io/stores';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 
 	const CHUNK_SIZE = 100000;

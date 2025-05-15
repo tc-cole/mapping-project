@@ -27,6 +27,7 @@ export interface LayerDef {
 	defaultProps: Record<string, any>; // minimal safe defaults
 }
 
+//@ts-expect-error
 export type LayerCtor<P = any> = new (props: P) => Layer<P>;
 
 export interface DeckLayerEntry<P = any> {
@@ -72,8 +73,6 @@ export class LayerStore {
 		this._store = writable(initial);
 		if (opts.persistKey) this.persist();
 	}
-
-	private static generateEmptyLayer() {}
 
 	/* ------------------------------------------------------------------ */
 	/* PUBLIC API                                                         */
@@ -237,8 +236,6 @@ function slug(base: string) {
 /* -------------------------------------------------------------------------- */
 /* Singleton convenience export                                               */
 /* -------------------------------------------------------------------------- */
-
-export const layers = new LayerStore();
 
 export const layerDefs: Record<LayerType, LayerDef> = {
 	scatter: {

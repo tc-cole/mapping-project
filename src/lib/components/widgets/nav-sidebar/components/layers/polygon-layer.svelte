@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { layers } from '$lib/components/io/layer-io.svelte';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+	import { chosenDataset, layers } from '$lib/components/io/stores';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -128,9 +128,8 @@
 						continue;
 					}
 
-					// Check for null/undefined polygon 					//@ts-expect-error
+					// Check for null/undefined polygon
 					//@ts-expect-error
-
 					if (row[polygonColumn] === null || row[polygonColumn] === undefined) {
 						nullPolygonCount++;
 						if (nullPolygonCount <= 5) {
@@ -144,7 +143,6 @@
 
 					// Check for null/undefined ID
 					//@ts-expect-error
-
 					if (row[idColumn] === null || row[idColumn] === undefined) {
 						nullIdCount++;
 						if (nullIdCount <= 5) {
@@ -158,34 +156,31 @@
 					try {
 						// Check if the polygon data is in GeoJSON format as a string
 						//@ts-expect-error
-
 						if (typeof row[polygonColumn] === 'string') {
 							// Try to parse as JSON
 							if (
 								//@ts-expect-error
-
-								row[polygonColumn].includes('coordinates') || //@ts-expect-error
-								row[polygonColumn].includes('geometry') || //@ts-expect-error
+								row[polygonColumn].includes('coordinates') ||
+								//@ts-expect-error
+								row[polygonColumn].includes('geometry') ||
+								//@ts-expect-error
 								row[polygonColumn].includes('type')
 							) {
 								try {
 									//@ts-expect-error
-
-									polygonData = JSON.parse(row[polygonColumn]); //@ts-expect-error
-
+									polygonData = JSON.parse(row[polygonColumn]);
+									//@ts-expect-error
 									console.log(`Successfully parsed polygon data as JSON for ID ${row[idColumn]}`);
 								} catch (parseError) {
 									parseErrorCount++;
 									if (parseErrorCount <= 5) {
 										console.error(
 											//@ts-expect-error
-
 											`Failed to parse polygon string as JSON for ID ${row[idColumn]}:`,
 											parseError
 										);
 										console.log(
 											//@ts-expect-error
-
 											`Invalid polygon string (first 200 chars): ${row[polygonColumn].substring(0, 200)}`
 										);
 									}
@@ -195,9 +190,8 @@
 								// If doesn't look like JSON, could be WKT or other format
 								console.warn(
 									//@ts-expect-error
-
-									`Polygon data for ID ${row[idColumn]} is a string but doesn't appear to be JSON, skipping:`, //@ts-expect-error
-
+									`Polygon data for ID ${row[idColumn]} is a string but doesn't appear to be JSON, skipping:`,
+									//@ts-expect-error
 									row[polygonColumn].substring(0, 100)
 								);
 								invalidPolygonCount++;
@@ -206,7 +200,6 @@
 						} else {
 							// Assume it's already a valid object
 							//@ts-expect-error
-
 							polygonData = row[polygonColumn];
 						}
 
@@ -240,7 +233,6 @@
 							otherGeometryTypeCount++;
 							if (otherGeometryTypeCount <= 5) {
 								//@ts-expect-error
-
 								console.warn(`Unexpected geometry type for ID ${row[idColumn]}: ${polygonType}`);
 							}
 						}
@@ -249,7 +241,6 @@
 						if (validPolygonCount < 2) {
 							if (polygonType === 'Polygon') {
 								//@ts-expect-error
-
 								console.log(`Polygon example (ID ${row[idColumn]}):`, {
 									type: polygonType,
 									rings: polygonData.coordinates ? polygonData.coordinates.length : 'unknown',
@@ -260,14 +251,12 @@
 								});
 							} else if (polygonType === 'MultiPolygon') {
 								//@ts-expect-error
-
 								console.log(`MultiPolygon example (ID ${row[idColumn]}):`, {
 									type: polygonType,
 									polygons: polygonData.coordinates ? polygonData.coordinates.length : 'unknown'
 								});
 							} else if (polygonType === 'Feature') {
 								//@ts-expect-error
-
 								console.log(`Feature example (ID ${row[idColumn]}):`, {
 									type: polygonType,
 									geometryType: polygonData.geometry ? polygonData.geometry.type : 'unknown'
@@ -276,7 +265,6 @@
 						}
 					} catch (e) {
 						//@ts-expect-error
-
 						console.error(`Failed to process polygon data for ID ${row[idColumn]}:`, e);
 						invalidPolygonCount++;
 						continue;
@@ -293,13 +281,11 @@
 							// Log some color values for debugging
 							if (colorValues.length <= 5 || colorValues.length % 1000 === 0) {
 								//@ts-expect-error
-
 								console.log(`Added color value: ${numericValue} for polygon ID ${row[idColumn]}`);
 							}
 						} else {
 							console.warn(
 								//@ts-expect-error
-
 								`Invalid color value (not a number) for ID ${row[idColumn]}: ${row[colorColumn]}`
 							);
 						}
@@ -313,8 +299,8 @@
 
 					// Create polygon object
 					const polygon = {
-						polygon: polygonData, //@ts-expect-error
-
+						polygon: polygonData,
+						//@ts-expect-error
 						id: row[idColumn],
 						colorValue: colorValue,
 						label: labelValue
@@ -326,7 +312,6 @@
 					// Log progress occasionally
 					if (validPolygonCount <= 5 || validPolygonCount % 1000 === 0) {
 						//@ts-expect-error
-
 						console.log(`Processed polygon ${validPolygonCount}: ID=${row[idColumn]}`);
 					}
 				}
@@ -388,7 +373,8 @@
 			console.log(`Color range: [${colorRange[0]}, ${colorRange[1]}]`);
 			console.log('==================== POLYGON TRANSFORM END ====================');
 		} catch (error) {
-			console.error('ERROR in polygon transformRows:', error); //@ts-expect-error
+			console.error('ERROR in polygon transformRows:', error);
+			//@ts-expect-error
 			console.error('Error stack:', error.stack);
 
 			// In case of error, yield what we have so far
@@ -545,7 +531,8 @@
 					const readRowsGenerator = stream.readRows();
 					yield* transformRows(readRowsGenerator);
 				} catch (streamError) {
-					console.error('Error in polygon layer stream query:', streamError); //@ts-expect-error
+					console.error('Error in polygon layer stream query:', streamError);
+					//@ts-expect-error
 					console.error('Stream error stack:', streamError.stack);
 					yield [];
 				}
@@ -555,8 +542,8 @@
 			}
 			console.log('==================== POLYGON LOAD DATA END ====================');
 		} catch (error) {
-			console.error('Error in polygon loadData:', error); //@ts-expect-error
-
+			console.error('Error in polygon loadData:', error);
+			//@ts-expect-error
 			console.error('Error stack:', error.stack);
 			// Return empty array in case of error
 			yield [];
@@ -581,172 +568,151 @@
 		});
 
 		try {
-			// Update main polygon layer
-			console.log(`Updating polygon layer with ID: ${layer.id}`);
+			// Remove the existing polygon layer
+			console.log(`Removing polygon layer with ID: ${layer.id}`);
+			layers.remove(layer.id);
 
-			layers.updateProps(layer.id, {
-				data: loadData(),
-				getPolygon: (d: any) => {
-					// Add validation for polygon data
-					if (!d || !d.polygon) {
-						console.warn('Invalid polygon data for getPolygon accessor:', d);
-						return [
-							[
-								[0, 0],
-								[0, 0],
-								[0, 0]
-							]
-						]; // Return a tiny triangle as default
-					}
-
-					// Handle different polygon formats
-					try {
-						// Direct Polygon object
-						if (d.polygon.type === 'Polygon' && d.polygon.coordinates) {
-							return d.polygon.coordinates;
-						}
-						// Feature with Polygon geometry
-						else if (
-							d.polygon.type === 'Feature' &&
-							d.polygon.geometry &&
-							d.polygon.geometry.type === 'Polygon'
-						) {
-							return d.polygon.geometry.coordinates;
-						}
-						// MultiPolygon
-						else if (d.polygon.type === 'MultiPolygon' && d.polygon.coordinates) {
-							// Flatten MultiPolygon coordinates to single Polygon for simplicity
-							// In a real app, you might want to handle this differently
-							return d.polygon.coordinates[0];
-						}
-						// Feature with MultiPolygon geometry
-						else if (
-							d.polygon.type === 'Feature' &&
-							d.polygon.geometry &&
-							d.polygon.geometry.type === 'MultiPolygon'
-						) {
-							return d.polygon.geometry.coordinates[0];
+			// Create a new polygon layer with updated properties
+			console.log(`Creating new polygon layer with ID: ${layer.id}`);
+			const newLayer = LayerFactory.create('polygon', {
+				id: layer.id,
+				props: {
+					data: loadData(),
+					getPolygon: (d: any) => {
+						// Add validation for polygon data
+						if (!d || !d.polygon) {
+							console.warn('Invalid polygon data for getPolygon accessor:', d);
+							return [
+								[
+									[0, 0],
+									[0, 0],
+									[0, 0]
+								]
+							]; // Return a tiny triangle as default
 						}
 
-						// Log the issue if we can't determine the polygon format
-						console.warn('Unknown polygon format:', d.polygon);
-						return [
-							[
-								[0, 0],
-								[0, 0],
-								[0, 0]
-							]
-						]; // Return a tiny triangle as default
-					} catch (e) {
-						console.error(`Error in getPolygon accessor for ID ${d.id}:`, e);
-						return [
-							[
-								[0, 0],
-								[0, 0],
-								[0, 0]
-							]
-						]; // Return a tiny triangle as default
-					}
-				},
-				getFillColor: getPolygonFillColor,
-				getLineColor: [0, 0, 0, 200],
-				getLineWidth: lineWidth,
-				lineWidthUnits: 'pixels',
-				extruded: false,
-				filled: true,
-				pickable: true,
-				autoHighlight: true,
-				opacity: fillOpacity,
-				colorScale: colorScale,
-				updateTriggers: {
-					getFillColor: [colorColumn, colorScale, fillOpacity, defaultColor, colorRange],
-					getLineWidth: [lineWidth],
-					getPolygon: [polygonColumn] // Update if polygon column changes
-				},
-				// Add callbacks for visibility debugging
-				onDataLoad: (info: any) => {
-					console.log('Polygon layer data loaded:', {
-						polygonCount: Array.isArray(info?.data) ? info.data.length : 0,
-						samplePolygon:
-							Array.isArray(info?.data) && info.data.length > 0
-								? {
-										id: info.data[0].id,
-										hasColor: info.data[0].colorValue !== null,
-										hasLabel: info.data[0].label !== null
-									}
-								: null
-					});
-				},
-				onHover: (info: any) => {
-					if (info && info.object) {
-						// Don't log every hover to avoid console spam
-						if (Math.random() < 0.1) {
-							// Only log ~10% of hovers
-							console.log('Polygon hover info:', {
-								id: info.object.id,
-								colorValue: info.object.colorValue,
-								label: info.object.label,
-								x: info.x,
-								y: info.y
-							});
+						// Handle different polygon formats
+						try {
+							// Direct Polygon object
+							if (d.polygon.type === 'Polygon' && d.polygon.coordinates) {
+								return d.polygon.coordinates;
+							}
+							// Feature with Polygon geometry
+							else if (
+								d.polygon.type === 'Feature' &&
+								d.polygon.geometry &&
+								d.polygon.geometry.type === 'Polygon'
+							) {
+								return d.polygon.geometry.coordinates;
+							}
+							// MultiPolygon
+							else if (d.polygon.type === 'MultiPolygon' && d.polygon.coordinates) {
+								// Flatten MultiPolygon coordinates to single Polygon for simplicity
+								return d.polygon.coordinates[0];
+							}
+							// Feature with MultiPolygon geometry
+							else if (
+								d.polygon.type === 'Feature' &&
+								d.polygon.geometry &&
+								d.polygon.geometry.type === 'MultiPolygon'
+							) {
+								return d.polygon.geometry.coordinates[0];
+							}
+
+							// Log the issue if we can't determine the polygon format
+							console.warn('Unknown polygon format:', d.polygon);
+							return [
+								[
+									[0, 0],
+									[0, 0],
+									[0, 0]
+								]
+							]; // Return a tiny triangle as default
+						} catch (e) {
+							console.error(`Error in getPolygon accessor for ID ${d.id}:`, e);
+							return [
+								[
+									[0, 0],
+									[0, 0],
+									[0, 0]
+								]
+							]; // Return a tiny triangle as default
+						}
+					},
+					getFillColor: (d: any) => getPolygonFillColor(d),
+					getLineColor: [0, 0, 0, 200],
+					getLineWidth: lineWidth,
+					lineWidthUnits: 'pixels',
+					extruded: false,
+					filled: true,
+					pickable: true,
+					autoHighlight: true,
+					opacity: fillOpacity,
+					colorScale: colorScale,
+					updateTriggers: {
+						getFillColor: [colorColumn, colorScale, fillOpacity, defaultColor, colorRange],
+						getLineWidth: [lineWidth],
+						getPolygon: [polygonColumn] // Update if polygon column changes
+					},
+					onDataLoad: (info: any) => {
+						console.log('Polygon layer data loaded:', {
+							polygonCount: Array.isArray(info?.data) ? info.data.length : 0,
+							samplePolygon:
+								Array.isArray(info?.data) && info.data.length > 0
+									? {
+											id: info.data[0].id,
+											hasColor: info.data[0].colorValue !== null,
+											hasLabel: info.data[0].label !== null
+										}
+									: null
+						});
+					},
+					onHover: (info: any) => {
+						if (info && info.object) {
+							// Don't log every hover to avoid console spam
+							if (Math.random() < 0.1) {
+								// Only log ~10% of hovers
+								console.log('Polygon hover info:', {
+									id: info.object.id,
+									colorValue: info.object.colorValue,
+									label: info.object.label,
+									x: info.x,
+									y: info.y
+								});
+							}
 						}
 					}
 				}
 			});
 
-			console.log(`Polygon layer updated successfully`);
+			// Add the new polygon layer to the map
+			console.log(`Adding new polygon layer with ID: ${layer.id}`);
+			layers.add(newLayer);
 
-			// Update text labels layer
-			const labelLayerId = `${layer.id}-labels`;
-			console.log(`Updating label layer with ID: ${labelLayerId}`);
+			//console.log(`Polygon layer updated successfully`);
 
-			try {
-				layers.updateProps(labelLayerId, {
-					data: loadData(),
-					getPosition: (d: any) => {
-						const position = getCentroid(d.polygon);
-						// Occasionally log label positions for debugging
-						if (Math.random() < 0.001) {
-							// Log ~0.1% of labels
-							console.log(`Label position for polygon ${d.id}: [${position[0]}, ${position[1]}]`);
-						}
-						return position;
-					},
-					getText: (d: any) => {
-						const text = d.label ? d.label.toString() : '';
-						// Occasionally log label text for debugging
-						if (text && Math.random() < 0.01) {
-							// Log ~1% of non-empty labels
-							console.log(`Label for polygon ${d.id}: "${text}"`);
-						}
-						return text;
-					},
-					getSize: 12,
-					getAngle: 0,
-					getTextAnchor: 'middle',
-					getAlignmentBaseline: 'center',
-					fontFamily: 'Arial',
-					fontWeight: 'bold',
-					outlineWidth: 2,
-					outlineColor: [255, 255, 255],
-					visible: showLabels && labelColumn !== null,
-					updateTriggers: {
-						getText: [labelColumn, showLabels],
-						getPosition: [polygonColumn] // Update if polygon column changes
-					}
-				});
-				console.log(`Label layer updated successfully`);
-			} catch (labelError) {
-				console.error('Error updating label layer:', labelError);
-				// Try to create the layer if updating failed
-				console.log('Attempting to create label layer...');
-				// Add code to create label layer if needed
-			}
+			// Remove the existing label layer if it exists
+			//const labelLayerId = `${layer.id}-labels`;
+			//if (currentLabelLayerId) {
+			//	console.log(`Removing existing label layer with ID: ${currentLabelLayerId}`);
+			//	try {
+			//		layers.remove(currentLabelLayerId);
+			//	} catch (e) {
+			//		console.warn(`Failed to remove label layer: ${e}`);
+			//	}
+			//}
+
+			// Create and add a new label layer if labels are enabled
+
+			// Update the current label layer ID
+			//	currentLabelLayerId = labelLayerId;
+			//	console.log(`Label layer updated successfully`);
+			//}
 
 			console.log('==================== POLYGON UPDATE COMPLETE ====================');
 		} catch (error) {
-			console.error('Error updating polygon layer:', error); //@ts-expect-error
-
+			console.error('Error updating polygon layer:', error);
+			//@ts-expect-error
 			console.error('Error stack:', error.stack);
 		}
 	}

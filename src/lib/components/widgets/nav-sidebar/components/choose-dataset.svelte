@@ -2,7 +2,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { fileUploadStore, chosenDataset } from '$lib/components/io/stores';
 	import SidebarMenuSubButton from '$lib/components/ui/sidebar/sidebar-menu-sub-button.svelte';
-	import SidebarMenuSubItem from '$lib/components/ui/sidebar/sidebar-menu-sub-item.svelte';
+	// import SidebarMenuSubItem from '$lib/components/ui/sidebar/sidebar-menu-sub-item.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 </script>
 
@@ -19,10 +19,10 @@
 	<DropdownMenu.Content class="w-40">
 		<DropdownMenu.Group>
 			{#each $fileUploadStore as dataset (dataset.filename)}
-				<SidebarMenuSubItem
+				<DropdownMenu.Item
 					onclick={() => {
 						chosenDataset.set(dataset);
-					}}>{dataset.filename}</SidebarMenuSubItem
+					}}>{dataset.filename}</DropdownMenu.Item
 				>
 			{/each}
 		</DropdownMenu.Group>

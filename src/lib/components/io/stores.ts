@@ -1,6 +1,7 @@
 import { storeFromLocalStorage } from '$lib/components/io/storage';
 import { writable } from 'svelte/store';
 import type { TableField } from './DuckDBWASMClient.svelte';
+import { LayerStore } from './layer-management.svelte';
 
 type FileUpload = {
 	filename: string;
@@ -14,4 +15,4 @@ export const chosenDataset = writable<FileUpload | null>(
 );
 
 export const deckGL = writable<any>(null);
-export const layers = writable<any[]>([]);
+export const layers = new LayerStore();

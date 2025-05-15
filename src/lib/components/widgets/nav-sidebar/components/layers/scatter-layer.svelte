@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
-	import { LayerFactory, layers } from '$lib/components/io/layer-io.svelte';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+	import { chosenDataset, layers } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { flyTo } from './utils/flyto';
@@ -197,34 +197,100 @@
 	}
 
 	function updateMapLayers() {
-		layers.remove(layer.id);
-
-		const scatterLayer = LayerFactory.create('scatter', {
-			props: {
-				data: loadData(),
-				getPosition: (d: Point) => d.position,
-				getRadius: (d: Point) => Math.sqrt(d.size) / 50, // Scale radius based on size
-				radiusScale: 1,
-				radiusMinPixels: 1,
-				radiusMaxPixels: 100,
-				pickable: true,
-				autoHighlight: true,
-				stroked: true,
-				filled: true,
-				lineWidthMinPixels: 1,
-				getLineColor: [0, 0, 0],
-				getSize: 12,
-				getAngle: 0,
-				getTextAnchor: 'middle',
-				getAlignmentBaseline: 'center',
-				getPixelOffset: [0, -20], // Offset above the point
-				fontFamily: 'Arial',
-				fontWeight: 'bold',
-				outlineWidth: 2,
-				outlineColor: [255, 255, 255]
-			}
+		console.log('==================== UPDATE SCATTER LAYER ====================');
+		console.log('Scatter layer columns selected:', {
+			lat: latitudeColumn,
+			lng: longitudeColumn,
+			size: sizeColumn,
+			color: colorColumn,
+			label: labelColumn
 		});
-		layers.add(scatterLayer);
+		console.log('Scatter layer style settings:', {
+			pointRadius,
+			minPointRadius,
+			maxPointRadius,
+			opacity,
+			colorScale,
+			showLabels
+		});
+
+		try {
+			// Remove the existing scatter layer
+			console.log(`Removing scatter layer with ID: ${layer.id}`);
+			layers.remove(layer.id);
+
+			// Create a new scatter layer with updated properties
+			console.log(`Creating new scatter layer with ID: ${layer.id}`);
+			const newScatterLayer = LayerFactory.create('scatter', {
+				id: layer.id,
+				props: {
+					data: loadData(),
+					getPosition: (d: Point) => {
+						if (!d || !d.position || d.position.length !== 2) {
+							console.warn('Invalid scatter position:', d);
+							return [0, 0]; // Default to prevent errors
+						}
+						return d.position;
+					},
+					getRadius: (d: Point) => {
+						const radius = getPointRadius(d);
+						// Periodically log radius calculations
+						if (Math.random() < 0.001) {
+							// log 0.1% of points
+							console.log(`Radius calculation for point:`, {
+								size: d.size,
+								calculatedRadius: radius,
+								sizeRange
+							});
+						}
+						return 400;
+					},
+					getFillColor: (d: Point) => {
+						const color = getPointColor(d);
+						// Periodically log color calculations
+						if (Math.random() < 0.001) {
+							// log 0.1% of points
+							console.log(`Color calculation for point:`, {
+								colorValue: d.color,
+								calculatedColor: color,
+								colorRange,
+								colorScale
+							});
+						}
+						return color;
+					},
+					getLineColor: [0, 0, 0],
+					lineWidthMinPixels: 1,
+					pickable: true,
+					autoHighlight: true,
+					stroked: true,
+					filled: true,
+					radiusScale: 1,
+					radiusMinPixels: 1,
+					radiusMaxPixels: 100,
+					opacity: opacity,
+					updateTriggers: {
+						getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
+						getFillColor: [colorColumn, colorScale, colorRange, opacity]
+					}
+				}
+			});
+
+			// Add the new scatter layer to the map
+			console.log(`Adding new scatter layer with ID: ${layer.id}`);
+			layers.add(newScatterLayer);
+
+			console.log(`Scatter layer updated successfully`);
+
+			// Create and add a new label layer if labels are enabled
+
+			// Update the current label layer ID
+
+			console.log('==================== SCATTER LAYER UPDATE COMPLETE ====================');
+		} catch (error) {
+			//@ts-expect-error
+			console.error('Error updating scatter layer:', error, error.stack);
+		}
 	}
 
 	// Dynamic point radius calculation

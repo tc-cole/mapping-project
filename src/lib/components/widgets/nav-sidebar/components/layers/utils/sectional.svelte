@@ -17,7 +17,7 @@
 			</SidebarMenuButton>
 		{/snippet}
 	</Collapsible.Trigger>
-	<Collapsible.Content class="ml-2 mt-2 p-2">
+	<Collapsible.Content class="mt-2 pl-2">
 		{@render children()}
 	</Collapsible.Content>
 </Collapsible.Root>

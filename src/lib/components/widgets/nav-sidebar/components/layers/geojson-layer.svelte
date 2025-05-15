@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { layers } from '$lib/components/io/layer-io.svelte';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+
+	import { chosenDataset, layers } from '$lib/components/io/stores';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -544,7 +545,7 @@
 		}
 	}
 
-	// Enhanced update map layers function with better error handling
+	// Updated function to use add/remove pattern instead of updateProps
 	function updateMapLayers() {
 		console.log('==================== UPDATE GEOJSON LAYER ====================');
 		console.log('GeoJSON layer columns selected:', {
@@ -567,112 +568,129 @@
 		});
 
 		try {
-			// Update GeoJSON layer
-			console.log(`Updating GeoJSON layer with ID: ${layer.id}`);
+			// Remove existing layer if it exists
+			if (layer.id) {
+				layers.remove(layer.id);
+				currentLayerId = null;
+			} else {
+				console.log(`Initial layer creation, no previous layer to remove`);
+			}
 
-			layers.updateProps(layer.id, {
-				data: loadData(),
-				filled: true,
-				stroked: true,
-				lineWidthScale: lineWidth,
-				getFillColor: (f: any) => {
-					// Use colorProperty if available, otherwise use default color
-					if (
-						colorProperty &&
-						f.properties?.colorValue !== undefined &&
-						f.properties?.colorValue !== null
-					) {
-						// This will be handled by the layer's color mapping
-						return [140, 170, 180, Math.floor(fillOpacity * 255)];
-					} else {
-						return [140, 170, 180, Math.floor(fillOpacity * 255)];
-					}
-				},
-				getLineColor: (f: any) => {
-					// Use colorProperty if available, otherwise use default color
-					if (
-						colorProperty &&
-						f.properties?.colorValue !== undefined &&
-						f.properties?.colorValue !== null
-					) {
-						// This will be handled by the layer's color mapping
-						return [0, 0, 0, Math.floor(lineOpacity * 255)];
-					} else {
-						return [0, 0, 0, Math.floor(lineOpacity * 255)];
-					}
-				},
-				getColorValue: (f: any) => {
-					const colorValue = f.properties?.colorValue;
-					// Periodically log color values for debugging
-					if (Math.random() < 0.001) {
-						// Log about 0.1% of features
-						console.log(`GeoJSON feature color value:`, {
-							colorValue: colorValue,
-							colorRange: colorRange
-						});
-					}
-					return colorValue;
-				},
-				getElevation: (f: any) => {
-					if (!extruded) return 0;
+			// Create a new GeoJSON layer using LayerFactory
+			console.log(`Creating new GeoJSON layer`);
 
-					const elevationValue = f.properties?.elevationValue || 0;
-					// Periodically log elevation values for debugging
-					if (Math.random() < 0.001) {
-						// Log about 0.1% of features
-						console.log(`GeoJSON feature elevation:`, {
-							elevationValue: elevationValue,
-							elevationScale: elevationScale
-						});
-					}
-					return elevationValue;
-				},
-				elevationScale: elevationScale,
-				extruded: extruded,
-				wireframe: false,
-				pickable: true,
-				autoHighlight: true,
-				pointRadiusScale: 5,
-				lineJointRounded: true,
-				fillColorScale: fillColorScale,
-				lineColorScale: lineColorScale,
-				colorScaleType: scaleType,
-				colorDomain: colorProperty ? colorRange : undefined,
-				updateTriggers: {
-					getFillColor: [fillColorScale, fillOpacity, colorProperty, colorRange],
-					getLineColor: [lineColorScale, lineOpacity, colorProperty, colorRange],
-					getElevation: [extruded, elevationProperty, elevationScale]
-				},
-				// Add callbacks for visibility debugging
-				onDataLoad: (info: any) => {
-					console.log('GeoJSON layer data loaded:', {
-						featureCount: info?.data?.features?.length || 0,
-						sampleFeature: info?.data?.features?.[0]
-							? {
-									type: info.data.features[0].type,
-									geometryType: info.data.features[0].geometry?.type
-								}
-							: null
-					});
-				},
-				onHover: (info: any) => {
-					if (info && info.object) {
-						// Don't log every hover to avoid console spam
-						if (Math.random() < 0.1) {
-							// Only log ~10% of hovers
-							console.log('GeoJSON hover info:', {
-								featureType: info.object.type,
-								geometryType: info.object.geometry?.type,
-								properties: info.object.properties,
-								x: info.x,
-								y: info.y
+			const newLayer = LayerFactory.create('geojson', {
+				props: {
+					data: loadData(),
+					filled: true,
+					stroked: true,
+					lineWidthScale: lineWidth,
+					getFillColor: (f: any) => {
+						// Use colorProperty if available, otherwise use default color
+						if (
+							colorProperty &&
+							f.properties?.colorValue !== undefined &&
+							f.properties?.colorValue !== null
+						) {
+							// This will be handled by the layer's color mapping
+							return [140, 170, 180, Math.floor(fillOpacity * 255)];
+						} else {
+							return [140, 170, 180, Math.floor(fillOpacity * 255)];
+						}
+					},
+					getLineColor: (f: any) => {
+						// Use colorProperty if available, otherwise use default color
+						if (
+							colorProperty &&
+							f.properties?.colorValue !== undefined &&
+							f.properties?.colorValue !== null
+						) {
+							// This will be handled by the layer's color mapping
+							return [0, 0, 0, Math.floor(lineOpacity * 255)];
+						} else {
+							return [0, 0, 0, Math.floor(lineOpacity * 255)];
+						}
+					},
+					getColorValue: (f: any) => {
+						const colorValue = f.properties?.colorValue;
+						// Periodically log color values for debugging
+						if (Math.random() < 0.001) {
+							// Log about 0.1% of features
+							console.log(`GeoJSON feature color value:`, {
+								colorValue: colorValue,
+								colorRange: colorRange
 							});
+						}
+						return colorValue;
+					},
+					getElevation: (f: any) => {
+						if (!extruded) return 0;
+
+						const elevationValue = f.properties?.elevationValue || 0;
+						// Periodically log elevation values for debugging
+						if (Math.random() < 0.001) {
+							// Log about 0.1% of features
+							console.log(`GeoJSON feature elevation:`, {
+								elevationValue: elevationValue,
+								elevationScale: elevationScale
+							});
+						}
+						return elevationValue;
+					},
+					elevationScale: elevationScale,
+					extruded: extruded,
+					wireframe: false,
+					pickable: true,
+					autoHighlight: true,
+					pointRadiusScale: 5,
+					lineJointRounded: true,
+					fillColorScale: fillColorScale,
+					lineColorScale: lineColorScale,
+					colorScaleType: scaleType,
+					colorDomain: colorProperty ? colorRange : undefined,
+					updateTriggers: {
+						getFillColor: [fillColorScale, fillOpacity, colorProperty, colorRange],
+						getLineColor: [lineColorScale, lineOpacity, colorProperty, colorRange],
+						getElevation: [extruded, elevationProperty, elevationScale]
+					},
+					// Add callbacks for visibility debugging
+					onDataLoad: (info: any) => {
+						console.log('GeoJSON layer data loaded:', {
+							featureCount: info?.data?.features?.length || 0,
+							sampleFeature: info?.data?.features?.[0]
+								? {
+										type: info.data.features[0].type,
+										geometryType: info.data.features[0].geometry?.type
+									}
+								: null
+						});
+					},
+					onHover: (info: any) => {
+						if (info && info.object) {
+							// Don't log every hover to avoid console spam
+							if (Math.random() < 0.1) {
+								// Only log ~10% of hovers
+								console.log('GeoJSON hover info:', {
+									featureType: info.object.type,
+									geometryType: info.object.geometry?.type,
+									properties: info.object.properties,
+									x: info.x,
+									y: info.y
+								});
+							}
 						}
 					}
 				}
 			});
 
-			console.log(`GeoJSON layer updated successfully`);
+			// Store the new layer ID for future updates
+			currentLayerId = newLayer.id;
+
+			// Add the new layer to the map
+			console.log(`Adding new GeoJSON layer with ID: ${newLayer.id}`);
+			layers.add(newLayer);
+
+			console.log(`GeoJSON layer updated successfully using add/remove pattern`);
 			console.log('==================== GEOJSON UPDATE COMPLETE ====================');
 		} catch (error) {
 			console.error('Error updating GeoJSON layer:', error); //@ts-expect-error

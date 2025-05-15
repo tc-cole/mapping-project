@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { layers } from '$lib/components/io/layer-io.svelte';
+	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+	import { layers } from '$lib/components/io/stores';
+
 	import { chosenDataset } from '$lib/components/io/stores';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
-
-	const CHUNK_SIZE = 100000;
 
 	// Source coordinates
 	let fromLatitude = $state<string | undefined>();
@@ -507,171 +507,75 @@
 		});
 
 		try {
-			// Update main arc layer
-			console.log(`Updating main arc layer with ID: ${layer.id}`);
-			layers.updateProps(layer.id, {
-				data: loadData(),
-				getSourcePosition: (d: any) => {
-					// Add validation for source position
-					if (!d || !d.sourcePosition || d.sourcePosition.length !== 2) {
-						console.warn('Invalid arc source position:', d);
-						return [0, 0]; // Default to prevent errors
-					}
-					return d.sourcePosition;
-				},
-				getTargetPosition: (d: any) => {
-					// Add validation for target position
-					if (!d || !d.targetPosition || d.targetPosition.length !== 2) {
-						console.warn('Invalid arc target position:', d);
-						return [0, 0]; // Default to prevent errors
-					}
-					return d.targetPosition;
-				},
-				getWidth: (d: any) => {
-					const width = getArcWidth(d);
-					// Periodically log width calculations
-					if (Math.random() < 0.001) {
-						// Log roughly 0.1% of arcs
-						console.log(`Width calculation for arc:`, {
-							width: d.width,
-							calculatedWidth: width,
-							widthRange
-						});
-					}
-					return width;
-				},
-				getSourceColor: [0, 64, 128],
-				getTargetColor: [255, 128, 0],
-				getColor: (d: any) => {
-					const color = getArcColor(d);
-					// Periodically log color calculations
-					if (Math.random() < 0.001) {
-						// Log roughly 0.1% of arcs
-						console.log(`Color calculation for arc:`, {
-							colorValue: d.color,
-							calculatedColor: color,
-							colorRange,
-							colorScale
-						});
-					}
-					return color;
-				},
-				widthScale: 1,
-				widthMinPixels: 1,
-				widthMaxPixels: 20,
-				opacity: opacity,
-				pickable: true,
-				autoHighlight: true,
-				getHeight: (d: any) => {
-					// Validate inputs
-					if (!d || !d.sourcePosition || !d.targetPosition) {
-						return 0;
-					}
+			// Remove the existing arc layer
 
-					// Calculate distance in degrees as a simple proxy for arc height
-					const sourceLng = d.sourcePosition[0];
-					const sourceLat = d.sourcePosition[1];
-					const targetLng = d.targetPosition[0];
-					const targetLat = d.targetPosition[1];
+			layers.remove(layer.id);
 
-					// Simple Euclidean distance as a baseline
-					const distance = Math.sqrt(
-						Math.pow(targetLng - sourceLng, 2) + Math.pow(targetLat - sourceLat, 2)
-					);
+			// Create a new arc layer with updated properties
 
-					const height = distance * arcHeight * arcHeightMultiplier;
-
-					// Occasionally log height calculations
-					if (Math.random() < 0.001) {
-						console.log(`Arc height calculation:`, {
-							sourcePosition: [sourceLng, sourceLat],
-							targetPosition: [targetLng, targetLat],
-							distance,
-							arcHeight,
-							arcHeightMultiplier,
-							calculatedHeight: height
-						});
-					}
-
-					return height;
-				},
-				colorScale: colorScale,
-				updateTriggers: {
-					getWidth: [arcWidth, widthColumn, minArcWidth, maxArcWidth, widthRange],
-					getColor: [colorColumn, colorScale, colorRange, opacity],
-					getHeight: [arcHeight, arcHeightMultiplier]
-				},
-				// Add callbacks for visibility debugging
-				onDataLoad: (info: any) => {
-					console.log('Arc layer data loaded:', info);
-				},
-				onHover: (info: any) => {
-					if (info && info.object) {
-						// Don't log every hover to avoid console spam
-						if (Math.random() < 0.1) {
-							// Only log ~10% of hovers
-							console.log('Arc hover info:', {
-								sourcePosition: info.object.sourcePosition,
-								targetPosition: info.object.targetPosition,
-								width: info.object.width,
-								color: info.object.color,
-								label: info.object.label,
-								x: info.x,
-								y: info.y
-							});
-						}
-					}
-				}
-			});
-			console.log(`Arc layer updated successfully`);
-
-			// Create or update label layer
-			const labelLayerId = `${layer.id}-labels`;
-			console.log(`Updating label layer with ID: ${labelLayerId}`);
-
-			try {
-				// Check if the label layer exists by attempting to update it
-				layers.updateProps(labelLayerId, {
+			const newLayer = LayerFactory.create('arc', {
+				id: layer.id,
+				props: {
 					data: loadData(),
-					getPosition: (d: any) => {
-						// Position label at the midpoint of the arc
+					getSourcePosition: (d: any) => {
+						// Add validation for source position
+						if (!d || !d.sourcePosition || d.sourcePosition.length !== 2) {
+							console.warn('Invalid arc source position:', d);
+							return [0, 0]; // Default to prevent errors
+						}
+						return d.sourcePosition;
+					},
+					getTargetPosition: (d: any) => {
+						// Add validation for target position
+						if (!d || !d.targetPosition || d.targetPosition.length !== 2) {
+							console.warn('Invalid arc target position:', d);
+							return [0, 0]; // Default to prevent errors
+						}
+						return d.targetPosition;
+					},
+					getWidth: (d: any) => getArcWidth(d),
+					getSourceColor: [0, 64, 128],
+					getTargetColor: [255, 128, 0],
+					getColor: (d: any) => getArcColor(d),
+					widthScale: 1,
+					widthMinPixels: 1,
+					widthMaxPixels: 20,
+					opacity: opacity,
+					pickable: true,
+					autoHighlight: true,
+					getHeight: (d: any) => {
+						// Validate inputs
 						if (!d || !d.sourcePosition || !d.targetPosition) {
-							console.warn('Invalid arc for label positioning:', d);
-							return [0, 0];
+							return 0;
 						}
 
+						// Calculate distance in degrees as a simple proxy for arc height
 						const sourceLng = d.sourcePosition[0];
 						const sourceLat = d.sourcePosition[1];
 						const targetLng = d.targetPosition[0];
 						const targetLat = d.targetPosition[1];
 
-						return [(sourceLng + targetLng) / 2, (sourceLat + targetLat) / 2];
+						// Simple Euclidean distance as a baseline
+						const distance = Math.sqrt(
+							Math.pow(targetLng - sourceLng, 2) + Math.pow(targetLat - sourceLat, 2)
+						);
+
+						return distance * arcHeight * arcHeightMultiplier;
 					},
-					getText: (d: any) => {
-						const text = d && d.label ? d.label.toString() : '';
-						// Occasionally log label text
-						if (text && Math.random() < 0.01) {
-							console.log(`Label for arc: "${text}"`);
-						}
-						return text;
-					},
-					getSize: 12,
-					getAngle: 0,
-					getTextAnchor: 'middle',
-					getAlignmentBaseline: 'center',
-					fontFamily: 'Arial',
-					fontWeight: 'bold',
-					outlineWidth: 2,
-					outlineColor: [255, 255, 255],
-					visible: showLabels && labelColumn !== null
-				});
-				console.log(`Label layer updated successfully`);
-			} catch (labelError: any) {
-				// If updating fails, the layer might not exist yet, so create it
-				console.log(`Label layer doesn't exist yet. Creating it...`);
-				// Here you would add code to create the label layer
-				// This depends on how your LayerFactory is set up
-			}
+					colorScale: colorScale,
+					updateTriggers: {
+						getWidth: [arcWidth, widthColumn, minArcWidth, maxArcWidth, widthRange],
+						getColor: [colorColumn, colorScale, colorRange, opacity],
+						getHeight: [arcHeight, arcHeightMultiplier]
+					}
+				}
+			});
+
+			// Add the new arc layer to the map
+			console.log(`Adding new arc layer with ID: ${layer.id}`);
+			layers.add(newLayer);
+
+			console.log(`Arc layer updated successfully`);
 
 			console.log('==================== ARC LAYER UPDATE COMPLETE ====================');
 		} catch (error: any) {

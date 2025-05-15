@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { layers as layerStore, mapViewState } from '$lib/components/io/layer-io.svelte';
+	import { mapViewState } from '$lib/components/io/layer-management.svelte';
+	import { layers } from '$lib/components/io/stores';
 
 	import { onDestroy } from 'svelte';
 	import { Deck } from '@deck.gl/core';
@@ -21,7 +22,7 @@
 	};
 
 	$effect(() => {
-		const updatedLayers = $layerStore
+		const updatedLayers = $layers
 			.filter((e) => e.ctor) //@ts-ignore
 			.map((e) => new e.ctor({ id: e.id, ...e.props }));
 		if (updatedLayers.length > 0 && deckInstance)
