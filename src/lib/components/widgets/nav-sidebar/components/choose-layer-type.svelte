@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { layers, layerDefs, type DeckLayerEntry } from '$lib/components/maps/layer-io.svelte';
+	import { layers, layerDefs, type DeckLayerEntry } from '$lib/components/io/layer-io.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
 
 	//import SidebarMenuItem from '$lib/components/ui/sidebar/sidebar-menu-item.svelte';
@@ -49,7 +49,7 @@
 				<DropdownMenu.Content class="w-40">
 					<DropdownMenu.Group>
 						{#each Object.entries(layerDefs) as [key, def]}
-							<DropdownMenu.Item onclick={(e) => chooseType(key)}>
+							<DropdownMenu.Item onclick={(_) => chooseType(key)}>
 								{def.label}
 							</DropdownMenu.Item>
 						{/each}

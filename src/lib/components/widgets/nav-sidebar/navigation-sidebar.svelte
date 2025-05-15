@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { LayerFactory } from '$lib/components/maps/layer-io.svelte';
+	import { LayerFactory } from '$lib/components/io/layer-io.svelte';
 	import SidebarLayerEditor from './components/editable-layer.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import AddDataset from './components/add-dataset.svelte';
-	import { layers } from '../../maps/layer-io.svelte';
+	import { layers } from '../../io/layer-io.svelte';
 	import { Plus } from '@lucide/svelte';
 
 	function addLayer() {
@@ -71,7 +71,7 @@
 <Sidebar.Root>
 	<Sidebar.Content>
 		<AddDataset />
-		<Button onclick={addArcLayer}>Add Test Layer</Button>
+		<Button onclick={addSampleLayer}>Add Test Layer</Button>
 
 		<Sidebar.Group class="-px-4">
 			<Button onclick={addLayer}>

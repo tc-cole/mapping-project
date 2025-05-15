@@ -547,20 +547,6 @@ async function insertUntypedCsv(
 	}
 }
 
-async function addExtensions(db: AsyncDuckDB, extension: string): Promise<void> {
-	try {
-		const conn = await db.connect();
-		await conn.query(`
-			INSTALL ${extension};
-			LOAD ${extension};
-			`);
-	} catch (error) {
-		throw new Error(
-			`Failed to Install or Load extension ${extension}: ${error instanceof Error ? error.message : String(error)}`
-		);
-	}
-}
-
 async function registerUrl(db: AsyncDuckDB, url: string, name?: string): Promise<void> {
 	try {
 		const filename = url.split('/').pop()!;

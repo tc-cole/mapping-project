@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { layers, mapViewState } from '$lib/components/maps/layer-io.svelte';
+	import { LayerFactory, layers } from '$lib/components/io/layer-io.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { chosenDataset } from '$lib/components/io/stores';
@@ -9,32 +9,6 @@
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
-
-	import { ScatterplotLayer } from '@deck.gl/layers';
-
-	type BartStation = {
-		name: string;
-		passengers: number;
-		coordinates: [longitude: number, latitude: number];
-	};
-
-	const l = new ScatterplotLayer<BartStation>({
-		id: 'bart-stations',
-		data: [
-			{ name: 'Colma', passengers: 4214, coordinates: [-122.466233, 37.684638] },
-			{ name: 'Civic Center', passengers: 24798, coordinates: [-122.413756, 37.779528] }
-			// ...
-		],
-		stroked: false,
-		filled: true,
-		getPosition: (d: BartStation) => d.coordinates,
-		getRadius: (d: BartStation) => Math.sqrt(d.passengers),
-		getFillColor: [255, 200, 0]
-	});
-
-	//console.log([l]);
-
-	const CHUNK_SIZE = 100000;
 
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
@@ -86,109 +60,171 @@
 		}
 	});
 
-	async function* transformRows(rows: AsyncIterable<any>) {
-		let points = [];
-		let sizeValues = [];
-		let colorValues = [];
+	async function* transformRows(
+		rows: AsyncIterable<Record<string, any>[]>
+	): AsyncGenerator<Point[], void, unknown> {
+		// Start with empty collections
+		let allPoints: Point[] = [];
+		let sizeValues: number[] = [];
+		let colorValues: number[] = [];
+		let batchCount = 0;
+		let totalRowsProcessed = 0;
+		let totalValidPoints = 0;
+		let invalidCoordinates = 0;
+		let nullCoordinates = 0;
 
-		for await (const row of rows) {
-			// Skip rows with missing coordinates
-			//@ts-ignore
-			if (row[latitudeColumn] === null || row[longitudeColumn] === null) {
-				continue;
-			}
+		try {
+			yield [];
 
-			const point = {
-				//@ts-expect-error
-				position: [row[longitudeColumn], row[latitudeColumn]],
-				size: sizeColumn ? row[sizeColumn] : 1,
-				color: colorColumn ? row[colorColumn] : null,
-				label: labelColumn ? row[labelColumn] : null
-			};
+			// DuckDB's queryStream.readRows() yields arrays of row objects
+			for await (const batch of rows) {
+				batchCount++;
+				totalRowsProcessed += batch.length;
 
-			// Collect values for calculating ranges
-			if (sizeColumn && row[sizeColumn] !== null) {
-				sizeValues.push(row[sizeColumn]);
-			}
+				const validPointsBatch: Point[] = [];
 
-			if (colorColumn && row[colorColumn] !== null) {
-				colorValues.push(row[colorColumn]);
-			}
+				for (const row of batch) {
+					if (!row) {
+						continue;
+					}
 
-			points.push(point);
+					if (
+						latitudeColumn === undefined ||
+						longitudeColumn === undefined ||
+						row[latitudeColumn] === null ||
+						row[latitudeColumn] === undefined ||
+						row[longitudeColumn] === null ||
+						row[longitudeColumn] === undefined
+					) {
+						nullCoordinates++;
+						continue;
+					}
 
-			if (points.length >= CHUNK_SIZE) {
-				// Process ranges before yielding first chunk
-				if (!dataLoaded && (sizeValues.length > 0 || colorValues.length > 0)) {
+					// Convert coordinates to numbers explicitly
+					const longitude = Number(row[longitudeColumn]);
+					const latitude = Number(row[latitudeColumn]);
+
+					// Skip if coordinates couldn't be converted to valid numbers
+					if (isNaN(longitude) || isNaN(latitude)) {
+						invalidCoordinates++;
+						continue;
+					}
+
+					// Get the size value (with default)
+					let sizeValue = 1;
+					if (sizeColumn && row[sizeColumn] !== null && row[sizeColumn] !== undefined) {
+						sizeValue = Number(row[sizeColumn]);
+						if (!isNaN(sizeValue)) {
+							sizeValues.push(sizeValue);
+						} else {
+							sizeValue = 1;
+						}
+					}
+
+					// Get the color value
+					let colorValue: number | null = null;
+					if (colorColumn && row[colorColumn] !== null && row[colorColumn] !== undefined) {
+						const val = Number(row[colorColumn]);
+						if (!isNaN(val)) {
+							colorValue = val;
+							colorValues.push(val);
+						} else {
+							colorValue = null;
+						}
+					}
+
+					// Get the label value
+					const labelValue =
+						labelColumn && row[labelColumn] !== null && row[labelColumn] !== undefined
+							? String(row[labelColumn])
+							: null;
+
+					// Create a point with properly formatted values
+					const point: Point = {
+						position: [longitude, latitude],
+						size: sizeValue,
+						color: colorValue,
+						label: labelValue
+					};
+
+					validPointsBatch.push(point);
+				}
+
+				totalValidPoints += validPointsBatch.length;
+				allPoints = [...allPoints, ...validPointsBatch];
+				if (batchCount === 1 && validPointsBatch.length > 0) {
+					// Calculate size range if we have size values
 					if (sizeValues.length > 0) {
-						sizeRange = [Math.min(...sizeValues), Math.max(...sizeValues)];
+						const min = Math.min(...sizeValues);
+						const max = Math.max(...sizeValues);
+						sizeRange = [min, max];
 					}
+
+					// Calculate color range if we have color values
 					if (colorValues.length > 0) {
-						colorRange = [Math.min(...colorValues), Math.max(...colorValues)];
+						const min = Math.min(...colorValues);
+						const max = Math.max(...colorValues);
+						colorRange = [min, max];
 					}
+
 					dataLoaded = true;
 				}
 
-				yield points;
-				points = [];
+				// Yield the complete accumulated array (important for deck.gl)
+				yield allPoints;
 			}
-		}
 
-		// Process ranges if this is the first and only chunk
-		if (!dataLoaded && (sizeValues.length > 0 || colorValues.length > 0)) {
-			if (sizeValues.length > 0) {
-				sizeRange = [Math.min(...sizeValues), Math.max(...sizeValues)];
+			// Final yield if we didn't yield any points yet
+			if (allPoints.length === 0) {
+				yield [];
 			}
-			if (colorValues.length > 0) {
-				colorRange = [Math.min(...colorValues), Math.max(...colorValues)];
+		} catch (error: unknown) {
+			// In case of error, yield any points we've collected so far
+			if (allPoints.length > 0) {
+				yield allPoints;
+			} else {
+				yield [];
 			}
-			dataLoaded = true;
-		}
-
-		if (points.length > 0) {
-			yield points;
 		}
 	}
 
+	// Define the Point type for clarity
+	interface Point {
+		position: [number, number];
+		size: number;
+		color: number | null;
+		label: string | null;
+	}
+
 	function updateMapLayers() {
-		layers.updateProps(layer.id, {
-			data: loadData(),
-			getPosition: (d: any) => d.position,
-			getRadius: getPointRadius,
-			getFillColor: getPointColor,
-			radiusScale: 1,
-			radiusMinPixels: 1,
-			radiusMaxPixels: 100,
-			opacity: opacity,
-			pickable: true,
-			autoHighlight: true,
-			stroked: true,
-			filled: true,
-			lineWidthMinPixels: 1,
-			getLineColor: [0, 0, 0],
-			colorScale: colorScale,
-			updateTriggers: {
-				getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
-				getFillColor: [colorColumn, colorScale, colorRange, opacity]
+		layers.remove(layer.id);
+
+		const scatterLayer = LayerFactory.create('scatter', {
+			props: {
+				data: loadData(),
+				getPosition: (d: Point) => d.position,
+				getRadius: (d: Point) => Math.sqrt(d.size) / 50, // Scale radius based on size
+				radiusScale: 1,
+				radiusMinPixels: 1,
+				radiusMaxPixels: 100,
+				pickable: true,
+				autoHighlight: true,
+				stroked: true,
+				filled: true,
+				lineWidthMinPixels: 1,
+				getLineColor: [0, 0, 0],
+				getSize: 12,
+				getAngle: 0,
+				getTextAnchor: 'middle',
+				getAlignmentBaseline: 'center',
+				getPixelOffset: [0, -20], // Offset above the point
+				fontFamily: 'Arial',
+				fontWeight: 'bold',
+				outlineWidth: 2,
+				outlineColor: [255, 255, 255]
 			}
 		});
-
-		// Update text labels layer
-		layers.updateProps(`${layer.id}-labels`, {
-			data: loadData(),
-			getPosition: (d: any) => d.position,
-			getText: (d: any) => d.label || '',
-			getSize: 12,
-			getAngle: 0,
-			getTextAnchor: 'middle',
-			getAlignmentBaseline: 'center',
-			getPixelOffset: [0, -20], // Offset above the point
-			fontFamily: 'Arial',
-			fontWeight: 'bold',
-			outlineWidth: 2,
-			outlineColor: [255, 255, 255],
-			visible: showLabels && labelColumn !== null
-		});
+		layers.add(scatterLayer);
 	}
 
 	// Dynamic point radius calculation
@@ -224,30 +260,63 @@
 		return [point.color, Math.floor(opacity * 255)];
 	}
 
-	const loadData = async function* () {
-		const db = SingletonDatabase.getInstance();
-		const client = await db.init();
-		if ($chosenDataset !== null) {
-			var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
+	async function* loadData() {
+		try {
+			// Initial empty dataset
+			yield [];
 
-			// Build column list for query
-			const columns = [latitudeColumn, longitudeColumn];
-			if (sizeColumn) columns.push(sizeColumn);
-			if (colorColumn) columns.push(colorColumn);
-			if (labelColumn) columns.push(labelColumn);
+			// Get database instance
+			const db = SingletonDatabase.getInstance();
+			const client = await db.init();
 
-			const columnsStr = columns.join(', ');
-			const data = await client.query(`SELECT ${columnsStr} FROM ${filename} LIMIT 1`);
+			if ($chosenDataset !== null) {
+				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
 
-			//@ts-ignore-error
-			const viewingPosition = data[0];
-			//@ts-ignore-error
-			flyTo(viewingPosition.longitude, viewingPosition.latitude);
-			//mapViewState.set(viewingPosition);
-			const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
-			yield* transformRows(stream.readRows());
+				// Build column list for query
+				const columns = [latitudeColumn, longitudeColumn];
+				if (sizeColumn) columns.push(sizeColumn);
+				if (colorColumn) columns.push(colorColumn);
+				if (labelColumn) columns.push(labelColumn);
+
+				const columnsStr = columns.join(', ');
+
+				// Sample query to get first row for positioning
+				console.log(`Executing query: SELECT ${columnsStr} FROM ${filename} LIMIT 1`);
+				const data = await client.query(`SELECT ${columnsStr} FROM ${filename} LIMIT 1`);
+
+				if (data && data.length > 0) {
+					const viewingPosition = data[0];
+					console.log('Initial viewing position:', viewingPosition);
+
+					// Fly to first point location
+
+					if (
+						longitudeColumn !== undefined &&
+						latitudeColumn !== undefined &&
+						viewingPosition[longitudeColumn] !== undefined &&
+						viewingPosition[latitudeColumn] !== undefined
+					) {
+						//@ts-expect-error
+						flyTo(viewingPosition[longitudeColumn], viewingPosition[latitudeColumn]);
+					}
+				}
+
+				// Main query with all data
+				console.log(`Executing stream query: SELECT ${columnsStr} FROM ${filename}`);
+				const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
+
+				// Transform the rows and yield the results
+				yield* transformRows(stream.readRows());
+			} else {
+				console.log('No dataset chosen');
+				yield [];
+			}
+		} catch (error) {
+			console.error('Error loading data:', error);
+			// Return empty array in case of error
+			yield [];
 		}
-	};
+	}
 </script>
 
 <!-- Required Coordinates -->

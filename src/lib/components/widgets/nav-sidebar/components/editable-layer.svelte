@@ -5,7 +5,7 @@
 	import ChooseLayerType from './choose-layer-type.svelte';
 	import ChooseDataset from './choose-dataset.svelte';
 
-	import { layers, layerDefs } from '$lib/components/maps/layer-io.svelte'; // singleton instance
+	import { layers, layerDefs } from '$lib/components/io/layer-io.svelte'; // singleton instance
 	import { X, ChevronDown } from '@lucide/svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 

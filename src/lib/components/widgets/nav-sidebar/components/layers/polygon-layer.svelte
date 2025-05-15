@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { layers } from '$lib/components/maps/layer-io.svelte';
+	import { layers } from '$lib/components/io/layer-io.svelte';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { Label } from '$lib/components/ui/label/index.js';

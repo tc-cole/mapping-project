@@ -1,4 +1,4 @@
-import { mapViewState } from '$lib/components/maps/layer-io.svelte';
+import { mapViewState } from '$lib/components/io/layer-io.svelte';
 import { FlyToInterpolator } from '@deck.gl/core';
 
 export function flyTo(lon: number, lat: number, zoom: number = 10) {
