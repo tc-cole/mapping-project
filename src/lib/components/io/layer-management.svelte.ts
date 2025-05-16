@@ -8,7 +8,8 @@ import {
 	ArcLayer,
 	LineLayer,
 	PathLayer,
-	PolygonLayer
+	PolygonLayer,
+	TextLayer
 } from '@deck.gl/layers';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
 
@@ -18,7 +19,7 @@ import { H3HexagonLayer } from '@deck.gl/geo-layers';
 
 // src/lib/deck/layer-defs.ts
 
-export type LayerType = 'scatter' | 'geojson' | 'arc' | 'line' | 'path' | 'polygon' | 'h3';
+export type LayerType = 'scatter' | 'geojson' | 'arc' | 'line' | 'path' | 'polygon' | 'h3' | 'text';
 //| 'trips';
 
 export interface LayerDef {
@@ -271,7 +272,7 @@ export const layerDefs: Record<LayerType, LayerDef> = {
 	},
 	*/
 	geojson: {
-		label: 'GeoJSON',
+		label: 'geojson',
 		ctor: GeoJsonLayer,
 		defaultProps: {
 			data: {},
@@ -337,6 +338,20 @@ export const layerDefs: Record<LayerType, LayerDef> = {
 			wireframe: false,
 			visible: true,
 			opacity: 1
+		}
+	},
+	text: {
+		label: 'Text',
+		ctor: TextLayer,
+		defaultProps: {
+			data: [],
+			getPosition: (d: any) => d.position,
+			getText: (d: any) => d.name,
+			getAlignmentBaseline: 'center',
+			getColor: [255, 128, 0],
+			getSize: 16,
+			getTextAnchor: 'middle',
+			pickable: true
 		}
 	},
 	h3: {

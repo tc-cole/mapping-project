@@ -30,6 +30,19 @@
 	let arcHeight = $state<number>(1);
 	let arcHeightMultiplier = $state<number>(1);
 
+	// Previous values for detecting changes
+	let prevWidthColumn = $state<string | null>(null);
+	let prevColorColumn = $state<string | null>(null);
+	let prevLabelColumn = $state<string | null>(null);
+	let prevArcWidth = $state<number>(2);
+	let prevMinArcWidth = $state<number>(1);
+	let prevMaxArcWidth = $state<number>(20);
+	let prevOpacity = $state<number>(0.8);
+	let prevColorScale = $state<string>('viridis');
+	let prevShowLabels = $state<boolean>(false);
+	let prevArcHeight = $state<number>(1);
+	let prevArcHeightMultiplier = $state<number>(1);
+
 	// Available color scales
 	const colorScales = [
 		'viridis',
@@ -49,11 +62,8 @@
 	// Used to store pre-calculated values for width and color ranges
 	let widthRange = $state([0, 1]);
 	let colorRange = $state([0, 1]);
-	let dataLoaded = $state(false);
 	let hasInitialized = $state(false);
-	let currentLabelLayerId = $state<string | null>(null);
 
-	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(
 		fromLatitude !== undefined &&
 			fromLongitude !== undefined &&
@@ -61,23 +71,104 @@
 			toLongitude !== undefined
 	);
 
-	// Derive the map layer configuration based on all input parameters
 	$effect(() => {
-		console.log('Effect checking required columns for Arc Layer:', {
-			fromLat: fromLatitude,
-			fromLng: fromLongitude,
-			toLat: toLatitude,
-			toLng: toLongitude
-		});
-
 		if (requiredColumnsSelected && !hasInitialized) {
 			console.log('Initializing arc layer - all required columns selected');
-			updateMapLayers();
+			createArcLayer();
 			hasInitialized = true;
 		}
 	});
 
-	// Enhanced transformer function for DuckDB query results
+	$effect(() => {
+		if (!hasInitialized) {
+			return;
+		}
+
+		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+
+		if (
+			currentLayer &&
+			(currentLayer.props.fromLatColumn !== fromLatitude ||
+				currentLayer.props.fromLngColumn !== fromLongitude ||
+				currentLayer.props.toLatColumn !== toLatitude ||
+				currentLayer.props.toLngColumn !== toLongitude)
+		) {
+			console.log('Coordinate columns changed, recreating arc layer');
+			createArcLayer();
+		}
+	});
+
+	// Update props when optional parameters change
+	$effect(() => {
+		// Only run after initial layer creation
+		if (!hasInitialized || !requiredColumnsSelected) {
+			return;
+		}
+
+		// Detect which properties have changed
+		const changedProps: Record<string, any> = {};
+
+		if (widthColumn !== prevWidthColumn) {
+			changedProps.widthColumn = widthColumn;
+			prevWidthColumn = widthColumn;
+		}
+
+		if (colorColumn !== prevColorColumn) {
+			changedProps.colorColumn = colorColumn;
+			prevColorColumn = colorColumn;
+		}
+
+		if (labelColumn !== prevLabelColumn) {
+			changedProps.labelColumn = labelColumn;
+			prevLabelColumn = labelColumn;
+		}
+
+		if (arcWidth !== prevArcWidth) {
+			changedProps.arcWidth = arcWidth;
+			prevArcWidth = arcWidth;
+		}
+
+		if (minArcWidth !== prevMinArcWidth) {
+			changedProps.minArcWidth = minArcWidth;
+			prevMinArcWidth = minArcWidth;
+		}
+
+		if (maxArcWidth !== prevMaxArcWidth) {
+			changedProps.maxArcWidth = maxArcWidth;
+			prevMaxArcWidth = maxArcWidth;
+		}
+
+		if (opacity !== prevOpacity) {
+			changedProps.opacity = opacity;
+			prevOpacity = opacity;
+		}
+
+		if (colorScale !== prevColorScale) {
+			changedProps.colorScale = colorScale;
+			prevColorScale = colorScale;
+		}
+
+		if (showLabels !== prevShowLabels) {
+			changedProps.showLabels = showLabels;
+			prevShowLabels = showLabels;
+		}
+
+		if (arcHeight !== prevArcHeight) {
+			changedProps.arcHeight = arcHeight;
+			prevArcHeight = arcHeight;
+		}
+
+		if (arcHeightMultiplier !== prevArcHeightMultiplier) {
+			changedProps.arcHeightMultiplier = arcHeightMultiplier;
+			prevArcHeightMultiplier = arcHeightMultiplier;
+		}
+
+		// Only update if something changed
+		if (Object.keys(changedProps).length > 0) {
+			updateOptionalProps(changedProps);
+		}
+	});
+
 	async function* transformRows(rows: AsyncIterable<any[]>): AsyncGenerator<any[], void, unknown> {
 		console.log('==================== ARC TRANSFORM START ====================');
 		console.log('Starting arc transformRows with columns:', {
@@ -90,7 +181,6 @@
 			label: labelColumn
 		});
 
-		// Start with empty collections
 		let allArcs: any[] = [];
 		let widthValues: number[] = [];
 		let colorValues: number[] = [];
@@ -102,37 +192,21 @@
 		let nullCoordinates = 0;
 
 		try {
-			// First yield an empty array to initialize the layer
-			console.log('Yielding initial empty array');
 			yield [];
 
-			// Process batches from DuckDB
 			for await (const batch of rows) {
 				batchCount++;
-				console.log(`\n----- ARC BATCH ${batchCount} -----`);
-				console.log(`Received batch with ${batch.length} rows`);
+
 				totalRowsProcessed += batch.length;
 
-				// Log the first row of each batch to see the raw format
 				if (batch.length > 0) {
 					console.log('First row in batch (raw):', JSON.stringify(batch[0], null, 2));
-					console.log(
-						`Source coordinates in first row: fromLat=${batch[0][fromLatitude!]}, fromLng=${batch[0][fromLongitude!]}`
-					);
-					console.log(
-						`Target coordinates in first row: toLat=${batch[0][toLatitude!]}, toLng=${batch[0][toLongitude!]}`
-					);
-				} else {
-					console.log('Batch is empty');
 				}
 
-				// Process each row in the batch
 				const validArcsBatch = [];
 
 				for (const row of batch) {
-					// Skip rows with missing coordinates
 					if (!row) {
-						console.log('Skipping undefined/null row');
 						continue;
 					}
 
@@ -144,12 +218,6 @@
 						row[fromLongitude!] === undefined
 					) {
 						nullCoordinates++;
-						if (nullCoordinates <= 5) {
-							console.log(
-								'Skipping row with null/undefined source coordinates:',
-								JSON.stringify(row, null, 2)
-							);
-						}
 						continue;
 					}
 
@@ -161,12 +229,6 @@
 						row[toLongitude!] === undefined
 					) {
 						nullCoordinates++;
-						if (nullCoordinates <= 5) {
-							console.log(
-								'Skipping row with null/undefined target coordinates:',
-								JSON.stringify(row, null, 2)
-							);
-						}
 						continue;
 					}
 
@@ -177,11 +239,6 @@
 					// Skip if source coordinates couldn't be converted to valid numbers
 					if (isNaN(fromLong) || isNaN(fromLat)) {
 						invalidSourceCoordinates++;
-						if (invalidSourceCoordinates <= 5) {
-							console.log(
-								`Skipping row with invalid source coordinates (NaN): fromLat=${row[fromLatitude!]}, fromLng=${row[fromLongitude!]}`
-							);
-						}
 						continue;
 					}
 
@@ -192,11 +249,6 @@
 					// Skip if target coordinates couldn't be converted to valid numbers
 					if (isNaN(toLong) || isNaN(toLat)) {
 						invalidTargetCoordinates++;
-						if (invalidTargetCoordinates <= 5) {
-							console.log(
-								`Skipping row with invalid target coordinates (NaN): toLat=${row[toLatitude!]}, toLng=${row[toLongitude!]}`
-							);
-						}
 						continue;
 					}
 
@@ -240,38 +292,16 @@
 					validArcsBatch.push(arc);
 				}
 
-				// Log batch summary
 				totalValidArcs += validArcsBatch.length;
-				console.log(
-					`Batch ${batchCount} results: ${validArcsBatch.length} valid arcs from ${batch.length} rows`
-				);
-
-				// Sample the transformed arcs
-				if (validArcsBatch.length > 0) {
-					console.log(
-						'First valid arc in batch (transformed):',
-						JSON.stringify(validArcsBatch[0], null, 2)
-					);
-
-					if (validArcsBatch.length > 1) {
-						console.log(
-							'Last valid arc in batch (transformed):',
-							JSON.stringify(validArcsBatch[validArcsBatch.length - 1], null, 2)
-						);
-					}
-				}
 
 				// Add valid arcs to our accumulated collection
 				allArcs = [...allArcs, ...validArcsBatch];
 
-				// Calculate ranges from the first batch for consistent visualization
 				if (batchCount === 1 && validArcsBatch.length > 0) {
-					// Calculate width range if we have width values
 					if (widthValues.length > 0) {
 						const min = Math.min(...widthValues);
 						const max = Math.max(...widthValues);
 						widthRange = [min, max];
-						console.log('Width range calculated:', widthRange);
 					}
 
 					// Calculate color range if we have color values
@@ -279,55 +309,16 @@
 						const min = Math.min(...colorValues);
 						const max = Math.max(...colorValues);
 						colorRange = [min, max];
-						console.log('Color range calculated:', colorRange);
-					}
-
-					dataLoaded = true;
-				}
-
-				// Log the current arc count
-				console.log(`TOTAL: ${allArcs.length} valid arcs so far after ${batchCount} batches`);
-
-				// Show a sample of current accumulated arcs
-				if (allArcs.length > 0) {
-					console.log('Sample of accumulated arcs:');
-					console.log(' - First arc:', JSON.stringify(allArcs[0], null, 2));
-					if (allArcs.length > 1) {
-						const middleIndex = Math.floor(allArcs.length / 2);
-						console.log(
-							` - Middle arc (${middleIndex}):`,
-							JSON.stringify(allArcs[middleIndex], null, 2)
-						);
-					}
-					if (allArcs.length > 2) {
-						console.log(
-							` - Last arc (${allArcs.length - 1}):`,
-							JSON.stringify(allArcs[allArcs.length - 1], null, 2)
-						);
 					}
 				}
 
-				// Yield the complete accumulated array
-				console.log(`Yielding array with ${allArcs.length} total arcs`);
 				yield allArcs;
 			}
 
 			// Final yield if we didn't yield any arcs yet
 			if (allArcs.length === 0) {
-				console.log('WARNING: No valid arcs found in any batch');
 				yield [];
 			}
-
-			// Log final statistics
-			console.log('\n========== ARC TRANSFORM SUMMARY ==========');
-			console.log(`Total batches processed: ${batchCount}`);
-			console.log(`Total rows processed: ${totalRowsProcessed}`);
-			console.log(`Total valid arcs: ${totalValidArcs}`);
-			console.log(`Invalid source coordinates: ${invalidSourceCoordinates}`);
-			console.log(`Invalid target coordinates: ${invalidTargetCoordinates}`);
-			console.log(`Null/undefined coordinates: ${nullCoordinates}`);
-			console.log(`Final arc array size: ${allArcs.length}`);
-			console.log('==================== ARC TRANSFORM END ====================');
 		} catch (error: any) {
 			console.error('ERROR in arc transformRows:', error);
 			console.error('Error stack:', error.stack);
@@ -424,24 +415,17 @@
 		return [r, g, b, Math.floor(opacity * 255)];
 	}
 
-	// Enhanced load data function with better error handling and logging
+	// Load data with async generator
 	async function* loadData(): AsyncGenerator<any[], void, unknown> {
 		try {
-			console.log('==================== ARC LOAD DATA START ====================');
 			// Initial empty dataset
-			console.log('Yielding initial empty array from loadData');
 			yield [];
 
-			// Get database instance
-			console.log('Getting database instance for arc layer');
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
-			console.log('Database client initialized for arc layer');
 
 			if ($chosenDataset !== null) {
-				console.log('Processing dataset for arc layer:', $chosenDataset);
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
-				console.log('Cleaned filename:', filename);
 
 				// Build column list for query
 				const columns = [fromLatitude, fromLongitude, toLatitude, toLongitude];
@@ -450,147 +434,190 @@
 				if (labelColumn) columns.push(labelColumn);
 
 				const columnsStr = columns.join(', ');
-				console.log('Arc layer query columns:', columnsStr);
-
-				// Main query with all data
-				console.log(`Executing arc layer stream query: SELECT ${columnsStr} FROM ${filename}`);
 
 				try {
 					const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
-					console.log('Arc layer stream query executed successfully');
-					console.log('Arc layer stream object:', stream);
-					console.log('Arc layer stream schema:', stream.schema);
-
-					// Log the schema details
-					if (stream.schema) {
-						console.log('Column details from schema for arc layer:');
-						stream.schema.forEach((field) => {
-							console.log(
-								` - ${field.name}: ${field.type} (${field.databaseType}) ${field.nullable ? 'nullable' : 'not nullable'}`
-							);
-						});
-					}
-
-					// Transform the rows and yield the results
-					console.log('Starting arc data transformation...');
-					const readRowsGenerator = stream.readRows();
-					yield* transformRows(readRowsGenerator);
+					yield* transformRows(stream.readRows());
 				} catch (streamError: any) {
 					console.error('Error in arc layer stream query:', streamError);
-					console.error('Stream error stack:', streamError.stack);
 					yield [];
 				}
 			} else {
-				console.log('No dataset chosen for arc layer');
 				yield [];
 			}
 			console.log('==================== ARC LOAD DATA END ====================');
 		} catch (error: any) {
 			console.error('Error in arc loadData:', error);
-			console.error('Error stack:', error.stack);
 			// Return empty array in case of error
 			yield [];
 		}
 	}
 
-	// Enhanced update map layers function with better error handling and logging
-	function updateMapLayers(): void {
-		console.log('==================== UPDATE ARC LAYERS ====================');
-		console.log('Arc layer columns selected:', {
-			fromLat: fromLatitude,
-			fromLng: fromLongitude,
-			toLat: toLatitude,
-			toLng: toLongitude,
-			width: widthColumn,
-			color: colorColumn,
-			label: labelColumn
-		});
-
+	// Create a new arc layer with all properties
+	function createArcLayer(): void {
 		try {
-			// Remove the existing arc layer
-
-			layers.remove(layer.id);
-
-			// Create a new arc layer with updated properties
-
-			const newLayer = LayerFactory.create('arc', {
-				id: layer.id,
-				props: {
-					data: loadData(),
-					getSourcePosition: (d: any) => {
-						// Add validation for source position
-						if (!d || !d.sourcePosition || d.sourcePosition.length !== 2) {
-							console.warn('Invalid arc source position:', d);
-							return [0, 0]; // Default to prevent errors
-						}
-						return d.sourcePosition;
-					},
-					getTargetPosition: (d: any) => {
-						// Add validation for target position
-						if (!d || !d.targetPosition || d.targetPosition.length !== 2) {
-							console.warn('Invalid arc target position:', d);
-							return [0, 0]; // Default to prevent errors
-						}
-						return d.targetPosition;
-					},
-					getWidth: (d: any) => getArcWidth(d),
-					getSourceColor: [0, 64, 128],
-					getTargetColor: [255, 128, 0],
-					getColor: (d: any) => getArcColor(d),
-					widthScale: 1,
-					widthMinPixels: 1,
-					widthMaxPixels: 20,
-					opacity: opacity,
-					pickable: true,
-					autoHighlight: true,
-					getHeight: (d: any) => {
-						// Validate inputs
-						if (!d || !d.sourcePosition || !d.targetPosition) {
-							return 0;
-						}
-
-						// Calculate distance in degrees as a simple proxy for arc height
-						const sourceLng = d.sourcePosition[0];
-						const sourceLat = d.sourcePosition[1];
-						const targetLng = d.targetPosition[0];
-						const targetLat = d.targetPosition[1];
-
-						// Simple Euclidean distance as a baseline
-						const distance = Math.sqrt(
-							Math.pow(targetLng - sourceLng, 2) + Math.pow(targetLat - sourceLat, 2)
-						);
-
-						return distance * arcHeight * arcHeightMultiplier;
-					},
-					colorScale: colorScale,
-					updateTriggers: {
-						getWidth: [arcWidth, widthColumn, minArcWidth, maxArcWidth, widthRange],
-						getColor: [colorColumn, colorScale, colorRange, opacity],
-						getHeight: [arcHeight, arcHeightMultiplier]
+			// Define the initial layer properties
+			const layerProps = {
+				data: loadData(),
+				getSourcePosition: (d: any) => {
+					if (!d || !d.sourcePosition || d.sourcePosition.length !== 2) {
+						console.warn('Invalid arc source position:', d);
+						return [0, 0]; // Default to prevent errors
 					}
-				}
+					return d.sourcePosition;
+				},
+				getTargetPosition: (d: any) => {
+					if (!d || !d.targetPosition || d.targetPosition.length !== 2) {
+						console.warn('Invalid arc target position:', d);
+						return [0, 0]; // Default to prevent errors
+					}
+					return d.targetPosition;
+				},
+				getWidth: (d: any) => getArcWidth(d),
+				getSourceColor: [0, 64, 128],
+				getTargetColor: [255, 128, 0],
+				getColor: (d: any) => getArcColor(d),
+				widthScale: 1,
+				widthMinPixels: 1,
+				widthMaxPixels: 20,
+				opacity: opacity,
+				pickable: true,
+				autoHighlight: true,
+				getHeight: (d: any) => {
+					// Validate inputs
+					if (!d || !d.sourcePosition || !d.targetPosition) {
+						return 0;
+					}
+
+					// Calculate distance in degrees as a simple proxy for arc height
+					const sourceLng = d.sourcePosition[0];
+					const sourceLat = d.sourcePosition[1];
+					const targetLng = d.targetPosition[0];
+					const targetLat = d.targetPosition[1];
+
+					// Simple Euclidean distance as a baseline
+					const distance = Math.sqrt(
+						Math.pow(targetLng - sourceLng, 2) + Math.pow(targetLat - sourceLat, 2)
+					);
+
+					return distance * arcHeight * arcHeightMultiplier;
+				},
+				updateTriggers: {
+					getWidth: [arcWidth, widthColumn, minArcWidth, maxArcWidth, widthRange],
+					getColor: [colorColumn, colorScale, colorRange, opacity],
+					getHeight: [arcHeight, arcHeightMultiplier]
+				},
+				// Store the column selections as props to detect changes later
+				fromLatColumn: fromLatitude,
+				fromLngColumn: fromLongitude,
+				toLatColumn: toLatitude,
+				toLngColumn: toLongitude,
+				widthColumn: widthColumn,
+				colorColumn: colorColumn,
+				labelColumn: labelColumn
+			};
+
+			// First check if a layer with this ID already exists (cleanup)
+			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (existingLayer) {
+				console.log(`Removing existing layer with ID: ${layer.id}`);
+				layers.remove(layer.id);
+			}
+
+			const newArcLayer = LayerFactory.create('arc', {
+				id: layer.id,
+				props: layerProps
 			});
 
-			// Add the new arc layer to the map
-			console.log(`Adding new arc layer with ID: ${layer.id}`);
-			layers.add(newLayer);
-
-			console.log(`Arc layer updated successfully`);
-
-			console.log('==================== ARC LAYER UPDATE COMPLETE ====================');
-		} catch (error: any) {
-			console.error('Error updating arc layers:', error);
-			console.error('Error stack:', error.stack);
+			layers.add(newArcLayer);
+		} catch (error) {
+			//@ts-expect-error
+			console.error('Error creating arc layer:', error, error.stack);
 		}
 	}
 
-	// Re-run updateMapLayers when parameters change after initialization
-	$effect(() => {
-		if (hasInitialized && requiredColumnsSelected) {
-			console.log('Updating arc layers due to parameter change');
-			updateMapLayers();
+	// Update layer props when optional parameters change
+	function updateOptionalProps(changedProps: Record<string, any>): void {
+		try {
+			// Find the current layer
+			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				return;
+			}
+
+			// Base update object with updateTriggers
+			const updateObj: Record<string, any> = { updateTriggers: {} };
+
+			// Handle width changes
+			if (
+				'arcWidth' in changedProps ||
+				'minArcWidth' in changedProps ||
+				'maxArcWidth' in changedProps ||
+				'widthColumn' in changedProps
+			) {
+				updateObj.getWidth = (d: any) => getArcWidth(d);
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getWidth: [arcWidth, widthColumn, minArcWidth, maxArcWidth, widthRange]
+				};
+			}
+
+			// Handle color changes
+			if (
+				'colorColumn' in changedProps ||
+				'colorScale' in changedProps ||
+				'opacity' in changedProps
+			) {
+				updateObj.getColor = (d: any) => getArcColor(d);
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getColor: [colorColumn, colorScale, colorRange, opacity]
+				};
+			}
+
+			// Handle height changes
+			if ('arcHeight' in changedProps || 'arcHeightMultiplier' in changedProps) {
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getHeight: [arcHeight, arcHeightMultiplier]
+				};
+			}
+
+			// Direct opacity setting
+			if ('opacity' in changedProps) {
+				updateObj.opacity = opacity;
+			}
+
+			// Update column references
+			if ('widthColumn' in changedProps) {
+				updateObj.widthColumn = widthColumn;
+			}
+
+			if ('colorColumn' in changedProps) {
+				updateObj.colorColumn = colorColumn;
+			}
+
+			if ('labelColumn' in changedProps) {
+				updateObj.labelColumn = labelColumn;
+			}
+
+			// If any data-related property changed, reload the data
+			if (
+				'widthColumn' in changedProps ||
+				'colorColumn' in changedProps ||
+				'labelColumn' in changedProps
+			) {
+				updateObj.data = loadData();
+			}
+
+			// Apply the updates
+			layers.updateProps(layer.id, updateObj);
+			console.log('Updated layer properties:', Object.keys(changedProps).join(', '));
+		} catch (error) {
+			console.error('Error updating arc layer props:', error);
 		}
-	});
+	}
 </script>
 
 <Sectional label="Required Coordinates">

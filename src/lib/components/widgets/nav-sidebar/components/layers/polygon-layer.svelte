@@ -9,8 +9,11 @@
 
 	const CHUNK_SIZE = 100000;
 
+	// Required columns
 	let polygonColumn = $state<string | undefined>();
 	let idColumn = $state<string | undefined>();
+
+	// Optional columns
 	let colorColumn = $state<string | null>(null);
 	let labelColumn = $state<string | null>(null);
 
@@ -20,9 +23,16 @@
 	let colorScale = $state<string>('viridis');
 	let showLabels = $state<boolean>(false);
 	let defaultColor = $state<[number, number, number]>([140, 170, 180]); // Default teal color
-	let currentLabelLayerId = $state<string | null>(null);
 
-	// Available color scales for choropleth mapping
+	// Previous values for tracking changes
+	let prevColorColumn = $state<string | null>(null);
+	let prevLabelColumn = $state<string | null>(null);
+	let prevFillOpacity = $state<number>(0.7);
+	let prevLineWidth = $state<number>(1);
+	let prevColorScale = $state<string>('viridis');
+	let prevShowLabels = $state<boolean>(false);
+	let prevDefaultColor = $state<[number, number, number]>([140, 170, 180]);
+
 	const colorScales = [
 		'viridis',
 		'plasma',
@@ -42,112 +52,107 @@
 	let colorRange = $state<[number, number]>([0, 1]);
 	let dataLoaded = $state(false);
 	let hasInitialized = $state(false);
+	let currentLabelLayerId = $state<string | null>(null);
 
 	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(polygonColumn !== undefined && idColumn !== undefined);
 
-	// Derive the map layer configuration based on all input parameters
 	$effect(() => {
-		console.log('Effect checking required columns for Polygon Layer:', {
-			polygonColumn,
-			idColumn
-		});
-
 		if (requiredColumnsSelected && !hasInitialized) {
-			console.log('Initializing polygon layer - all required columns selected');
-			updateMapLayers();
+			createPolygonLayer();
 			hasInitialized = true;
 		}
 	});
 
-	// Also update when parameters change
 	$effect(() => {
-		if (hasInitialized && requiredColumnsSelected) {
-			console.log('Updating polygon layer due to parameter change');
-			updateMapLayers();
+		if (!hasInitialized) {
+			return;
+		}
+
+		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+
+		if (
+			currentLayer &&
+			(currentLayer.props.polygonColumn !== polygonColumn ||
+				currentLayer.props.idColumn !== idColumn)
+		) {
+			createPolygonLayer();
 		}
 	});
 
-	// Enhanced polygon transformer function with comprehensive debugging
-	async function* transformRows(rows: AsyncIterable<any[]>) {
-		console.log('==================== POLYGON TRANSFORM START ====================');
-		console.log('Starting polygon transformRows with columns:', {
-			polygon: polygonColumn,
-			id: idColumn,
-			color: colorColumn,
-			label: labelColumn
-		});
+	$effect(() => {
+		if (!hasInitialized || !requiredColumnsSelected) {
+			return;
+		}
 
-		// Stats tracking
+		const changedProps: Record<string, any> = {};
+
+		if (colorColumn !== prevColorColumn) {
+			changedProps.colorColumn = colorColumn;
+			prevColorColumn = colorColumn;
+		}
+
+		if (labelColumn !== prevLabelColumn) {
+			changedProps.labelColumn = labelColumn;
+			prevLabelColumn = labelColumn;
+		}
+
+		if (fillOpacity !== prevFillOpacity) {
+			changedProps.fillOpacity = fillOpacity;
+			prevFillOpacity = fillOpacity;
+		}
+
+		if (lineWidth !== prevLineWidth) {
+			changedProps.lineWidth = lineWidth;
+			prevLineWidth = lineWidth;
+		}
+
+		if (colorScale !== prevColorScale) {
+			changedProps.colorScale = colorScale;
+			prevColorScale = colorScale;
+		}
+
+		if (showLabels !== prevShowLabels) {
+			changedProps.showLabels = showLabels;
+			prevShowLabels = showLabels;
+		}
+
+		if (defaultColor !== prevDefaultColor) {
+			changedProps.defaultColor = defaultColor;
+			prevDefaultColor = defaultColor;
+		}
+
+		if (Object.keys(changedProps).length > 0) {
+			updateOptionalProps(changedProps);
+		}
+	});
+
+	async function* transformRows(rows: AsyncIterable<any[]>) {
 		let allPolygons: any[] = [];
 		let colorValues = [];
-		let batchCount = 0;
-		let totalRowsProcessed = 0;
 		let validPolygonCount = 0;
-		let invalidPolygonCount = 0;
-		let nullPolygonCount = 0;
-		let nullIdCount = 0;
-		let parseErrorCount = 0;
-		let polygonTypeCount = 0;
-		let multiPolygonTypeCount = 0;
-		let otherGeometryTypeCount = 0;
+		let batchCount = 0;
 
 		try {
-			// First yield an empty array to initialize
-			console.log('Yielding initial empty array');
 			yield [];
 
 			// Process batches from DuckDB
 			for await (const batch of rows) {
 				batchCount++;
-				console.log(`\n----- POLYGON BATCH ${batchCount} -----`);
-				console.log(`Received batch with ${batch.length} rows`);
-				totalRowsProcessed += batch.length;
-
-				// Log the first row of each batch to see the raw format
-				if (batch.length > 0) {
-					console.log('First row in batch (raw):', JSON.stringify(batch[0], null, 2));
-
-					if (colorColumn) {
-						console.log(`Color column in first row: ${batch[0][colorColumn]}`);
-					}
-					if (labelColumn) {
-						console.log(`Label column in first row: ${batch[0][labelColumn]}`);
-					}
-				} else {
-					console.log('Batch is empty');
-				}
-
-				// Process each row in the batch
 				const validPolygons = [];
 
 				for (const row of batch) {
-					// Skip rows with missing data
-					if (!row) {
-						console.log('Skipping undefined/null row');
-						continue;
-					}
+					if (!row) continue;
 
-					// Check for null/undefined polygon
-					//@ts-expect-error
-					if (row[polygonColumn] === null || row[polygonColumn] === undefined) {
-						nullPolygonCount++;
-						if (nullPolygonCount <= 5) {
-							console.log(
-								'Skipping row with null/undefined polygon:',
-								JSON.stringify(row, null, 2)
-							);
-						}
-						continue;
-					}
-
-					// Check for null/undefined ID
-					//@ts-expect-error
-					if (row[idColumn] === null || row[idColumn] === undefined) {
-						nullIdCount++;
-						if (nullIdCount <= 5) {
-							console.log('Skipping row with null/undefined ID:', JSON.stringify(row, null, 2));
-						}
+					// Check for required column values
+					if (
+						//@ts-expect-error
+						row[polygonColumn] === null || //@ts-expect-error
+						row[polygonColumn] === undefined ||
+						//@ts-expect-error
+						row[idColumn] === null || //@ts-expect-error
+						row[idColumn] === undefined
+					) {
 						continue;
 					}
 
@@ -169,32 +174,11 @@
 								try {
 									//@ts-expect-error
 									polygonData = JSON.parse(row[polygonColumn]);
-									//@ts-expect-error
-									console.log(`Successfully parsed polygon data as JSON for ID ${row[idColumn]}`);
 								} catch (parseError) {
-									parseErrorCount++;
-									if (parseErrorCount <= 5) {
-										console.error(
-											//@ts-expect-error
-											`Failed to parse polygon string as JSON for ID ${row[idColumn]}:`,
-											parseError
-										);
-										console.log(
-											//@ts-expect-error
-											`Invalid polygon string (first 200 chars): ${row[polygonColumn].substring(0, 200)}`
-										);
-									}
 									continue;
 								}
 							} else {
 								// If doesn't look like JSON, could be WKT or other format
-								console.warn(
-									//@ts-expect-error
-									`Polygon data for ID ${row[idColumn]} is a string but doesn't appear to be JSON, skipping:`,
-									//@ts-expect-error
-									row[polygonColumn].substring(0, 100)
-								);
-								invalidPolygonCount++;
 								continue;
 							}
 						} else {
@@ -205,68 +189,9 @@
 
 						// Basic validation of polygon data
 						if (!polygonData || typeof polygonData !== 'object') {
-							invalidPolygonCount++;
-							if (invalidPolygonCount <= 5) {
-								console.error(
-									//@ts-expect-error
-									`Invalid polygon data for ID ${row[idColumn]}, not an object:`,
-									polygonData
-								);
-							}
 							continue;
 						}
-
-						// Count polygon types
-						let polygonType = polygonData.type;
-
-						// If it's a Feature, extract the geometry type
-						if (polygonType === 'Feature' && polygonData.geometry) {
-							polygonType = polygonData.geometry.type;
-						}
-
-						// Count by geometry type
-						if (polygonType === 'Polygon') {
-							polygonTypeCount++;
-						} else if (polygonType === 'MultiPolygon') {
-							multiPolygonTypeCount++;
-						} else {
-							otherGeometryTypeCount++;
-							if (otherGeometryTypeCount <= 5) {
-								//@ts-expect-error
-								console.warn(`Unexpected geometry type for ID ${row[idColumn]}: ${polygonType}`);
-							}
-						}
-
-						// Log some polygon structure examples for debugging
-						if (validPolygonCount < 2) {
-							if (polygonType === 'Polygon') {
-								//@ts-expect-error
-								console.log(`Polygon example (ID ${row[idColumn]}):`, {
-									type: polygonType,
-									rings: polygonData.coordinates ? polygonData.coordinates.length : 'unknown',
-									firstRingPoints:
-										polygonData.coordinates && polygonData.coordinates[0]
-											? polygonData.coordinates[0].length
-											: 'unknown'
-								});
-							} else if (polygonType === 'MultiPolygon') {
-								//@ts-expect-error
-								console.log(`MultiPolygon example (ID ${row[idColumn]}):`, {
-									type: polygonType,
-									polygons: polygonData.coordinates ? polygonData.coordinates.length : 'unknown'
-								});
-							} else if (polygonType === 'Feature') {
-								//@ts-expect-error
-								console.log(`Feature example (ID ${row[idColumn]}):`, {
-									type: polygonType,
-									geometryType: polygonData.geometry ? polygonData.geometry.type : 'unknown'
-								});
-							}
-						}
 					} catch (e) {
-						//@ts-expect-error
-						console.error(`Failed to process polygon data for ID ${row[idColumn]}:`, e);
-						invalidPolygonCount++;
 						continue;
 					}
 
@@ -277,17 +202,6 @@
 						if (!isNaN(numericValue)) {
 							colorValue = numericValue;
 							colorValues.push(numericValue);
-
-							// Log some color values for debugging
-							if (colorValues.length <= 5 || colorValues.length % 1000 === 0) {
-								//@ts-expect-error
-								console.log(`Added color value: ${numericValue} for polygon ID ${row[idColumn]}`);
-							}
-						} else {
-							console.warn(
-								//@ts-expect-error
-								`Invalid color value (not a number) for ID ${row[idColumn]}: ${row[colorColumn]}`
-							);
 						}
 					}
 
@@ -308,18 +222,7 @@
 
 					validPolygons.push(polygon);
 					validPolygonCount++;
-
-					// Log progress occasionally
-					if (validPolygonCount <= 5 || validPolygonCount % 1000 === 0) {
-						//@ts-expect-error
-						console.log(`Processed polygon ${validPolygonCount}: ID=${row[idColumn]}`);
-					}
 				}
-
-				// Log batch summary
-				console.log(
-					`Batch ${batchCount} results: ${validPolygons.length} valid polygons from ${batch.length} rows`
-				);
 
 				// Add valid polygons to accumulated collection
 				allPolygons = [...allPolygons, ...validPolygons];
@@ -329,68 +232,36 @@
 					const min = Math.min(...colorValues);
 					const max = Math.max(...colorValues);
 					colorRange = [min, max];
-					console.log('Color range calculated:', colorRange);
 					dataLoaded = true;
 				}
 
-				// Log the total polygons processed so far
-				console.log(
-					`TOTAL: ${allPolygons.length} valid polygons so far after ${batchCount} batches`
-				);
-
 				// Yield the accumulated polygons
-				console.log(`Yielding array with ${allPolygons.length} total polygons`);
 				yield allPolygons;
 
-				// If we've reached the chunk size, start a new collection
+				// Reset collection if chunk size limit is reached
 				if (allPolygons.length >= CHUNK_SIZE) {
-					console.log(`Reached chunk size limit (${CHUNK_SIZE}), resetting polygon collection`);
 					allPolygons = [];
 				}
 			}
 
-			// Final yield if we didn't yield any polygons yet
+			// Final empty yield if no polygons were found
 			if (allPolygons.length === 0) {
-				console.log('WARNING: No valid polygons found in any batch');
 				yield [];
 			}
-
-			// Log final statistics
-			console.log('\n========== POLYGON TRANSFORM SUMMARY ==========');
-			console.log(`Total batches processed: ${batchCount}`);
-			console.log(`Total rows processed: ${totalRowsProcessed}`);
-			console.log(`Valid polygons: ${validPolygonCount}`);
-			console.log(`Geometry types:`);
-			console.log(` - Polygon: ${polygonTypeCount}`);
-			console.log(` - MultiPolygon: ${multiPolygonTypeCount}`);
-			console.log(` - Other/unknown: ${otherGeometryTypeCount}`);
-			console.log(`Invalid data counts:`);
-			console.log(` - Null/undefined polygons: ${nullPolygonCount}`);
-			console.log(` - Null/undefined IDs: ${nullIdCount}`);
-			console.log(` - Invalid polygon format: ${invalidPolygonCount}`);
-			console.log(` - Parse errors: ${parseErrorCount}`);
-			console.log(`Color values: ${colorValues.length}`);
-			console.log(`Color range: [${colorRange[0]}, ${colorRange[1]}]`);
-			console.log('==================== POLYGON TRANSFORM END ====================');
 		} catch (error) {
 			console.error('ERROR in polygon transformRows:', error);
-			//@ts-expect-error
-			console.error('Error stack:', error.stack);
 
 			// In case of error, yield what we have so far
 			if (allPolygons.length > 0) {
-				console.log(`Error occurred, but yielding ${allPolygons.length} polygons collected so far`);
 				yield allPolygons;
 			} else {
-				console.log('Error occurred and no polygons collected, yielding empty array');
 				yield [];
 			}
 		}
 	}
 
-	// Function to get polygon centroid for label placement with enhanced error handling
+	// Function to get polygon centroid for label placement
 	function getCentroid(polygon: any) {
-		// This is a simplified centroid calculation
 		try {
 			// Handle different polygon formats
 			let coordinates = null;
@@ -439,66 +310,36 @@
 				return [x / coordinates.length, y / coordinates.length];
 			}
 
-			// Log the issue if we can't determine the centroid
-			// But don't spam the console if there are many such cases
-			if (Math.random() < 0.01) {
-				// Log roughly 1% of problem cases
-				console.warn('Unable to determine polygon centroid:', {
-					polygonType: polygon.type,
-					hasCoordinates: polygon.coordinates ? 'yes' : 'no',
-					hasGeometry: polygon.geometry ? 'yes' : 'no'
-				});
-			}
-
 			// Return a default position if we can't calculate
 			return [0, 0];
 		} catch (e) {
-			console.error('Error calculating centroid:', e);
 			return [0, 0];
 		}
 	}
 
-	// Dynamic color function based on the selected color column with enhanced logging
+	// Dynamic color function based on the selected color column
 	function getPolygonFillColor(d: any) {
 		// If no color column is selected or the value is null, return the default color
 		if (!colorColumn || d.colorValue === null || d.colorValue === undefined) {
-			// Occasionally log default color usage
-			if (Math.random() < 0.001) {
-				// Log ~0.1% of polygons
-				console.log(`Using default color for polygon ID ${d.id}`);
-			}
 			return [...defaultColor, Math.floor(fillOpacity * 255)];
 		}
 
 		// For numeric values, let the deck.gl layer handle the color scaling
-		// Occasionally log color values for debugging
-		if (Math.random() < 0.001) {
-			// Log ~0.1% of polygons
-			console.log(
-				`Polygon ${d.id} color value: ${d.colorValue}, range: [${colorRange[0]}, ${colorRange[1]}]`
-			);
-		}
 		return [d.colorValue, Math.floor(fillOpacity * 255)];
 	}
 
-	// Enhanced loadData function with better error handling and logging
+	// Load data from DuckDB
 	async function* loadData() {
 		try {
-			console.log('==================== POLYGON LOAD DATA START ====================');
 			// Initial empty dataset
-			console.log('Yielding initial empty array from loadData');
 			yield [];
 
 			// Get database instance
-			console.log('Getting database instance for polygon layer');
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
-			console.log('Database client initialized for polygon layer');
 
 			if ($chosenDataset !== null) {
-				console.log('Processing dataset for polygon layer:', $chosenDataset);
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
-				console.log('Cleaned filename:', filename);
 
 				// Build column list for query
 				const columns = [polygonColumn, idColumn];
@@ -506,214 +347,262 @@
 				if (labelColumn) columns.push(labelColumn);
 
 				const columnsStr = columns.join(', ');
-				console.log('Polygon layer query columns:', columnsStr);
-
-				// Main query with all data
-				console.log(`Executing polygon layer query: SELECT ${columnsStr} FROM ${filename}`);
 
 				try {
 					const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
-					console.log('Polygon layer stream query executed successfully');
-					console.log('Polygon layer stream schema:', stream.schema);
-
-					// Log the schema details
-					if (stream.schema) {
-						console.log('Column details from schema for polygon layer:');
-						stream.schema.forEach((field) => {
-							console.log(
-								` - ${field.name}: ${field.type} (${field.databaseType}) ${field.nullable ? 'nullable' : 'not nullable'}`
-							);
-						});
-					}
-
-					// Transform the rows and yield the results
-					console.log('Starting polygon data transformation...');
 					const readRowsGenerator = stream.readRows();
 					yield* transformRows(readRowsGenerator);
 				} catch (streamError) {
 					console.error('Error in polygon layer stream query:', streamError);
-					//@ts-expect-error
-					console.error('Stream error stack:', streamError.stack);
 					yield [];
 				}
 			} else {
-				console.log('No dataset chosen for polygon layer');
 				yield [];
 			}
-			console.log('==================== POLYGON LOAD DATA END ====================');
 		} catch (error) {
 			console.error('Error in polygon loadData:', error);
-			//@ts-expect-error
-			console.error('Error stack:', error.stack);
-			// Return empty array in case of error
 			yield [];
 		}
 	}
 
-	// Enhanced update map layers function with better error handling
-	function updateMapLayers() {
-		console.log('==================== UPDATE POLYGON LAYER ====================');
-		console.log('Polygon layer columns selected:', {
-			polygon: polygonColumn,
-			id: idColumn,
-			color: colorColumn,
-			label: labelColumn
-		});
-		console.log('Polygon layer style settings:', {
-			fillOpacity,
-			lineWidth,
-			colorScale,
-			showLabels,
-			defaultColor
-		});
-
+	// Create initial polygon layer
+	function createPolygonLayer() {
 		try {
-			// Remove the existing polygon layer
-			console.log(`Removing polygon layer with ID: ${layer.id}`);
-			layers.remove(layer.id);
+			const layerProps = {
+				data: loadData(),
+				getPolygon: (d: any) => {
+					// Add validation for polygon data
+					if (!d || !d.polygon) {
+						return [
+							[
+								[0, 0],
+								[0, 0],
+								[0, 0]
+							]
+						]; // Return a tiny triangle as default
+					}
 
-			// Create a new polygon layer with updated properties
-			console.log(`Creating new polygon layer with ID: ${layer.id}`);
+					// Handle different polygon formats
+					try {
+						// Direct Polygon object
+						if (d.polygon.type === 'Polygon' && d.polygon.coordinates) {
+							return d.polygon.coordinates;
+						}
+						// Feature with Polygon geometry
+						else if (
+							d.polygon.type === 'Feature' &&
+							d.polygon.geometry &&
+							d.polygon.geometry.type === 'Polygon'
+						) {
+							return d.polygon.geometry.coordinates;
+						}
+						// MultiPolygon
+						else if (d.polygon.type === 'MultiPolygon' && d.polygon.coordinates) {
+							// Flatten MultiPolygon coordinates to single Polygon for simplicity
+							return d.polygon.coordinates[0];
+						}
+						// Feature with MultiPolygon geometry
+						else if (
+							d.polygon.type === 'Feature' &&
+							d.polygon.geometry &&
+							d.polygon.geometry.type === 'MultiPolygon'
+						) {
+							return d.polygon.geometry.coordinates[0];
+						}
+
+						// Return a default if we can't determine the polygon format
+						return [
+							[
+								[0, 0],
+								[0, 0],
+								[0, 0]
+							]
+						]; // Return a tiny triangle as default
+					} catch (e) {
+						return [
+							[
+								[0, 0],
+								[0, 0],
+								[0, 0]
+							]
+						]; // Return a tiny triangle as default
+					}
+				},
+				getFillColor: (d: any) => getPolygonFillColor(d),
+				getLineColor: [0, 0, 0, 200],
+				getLineWidth: lineWidth,
+				lineWidthUnits: 'pixels',
+				extruded: false,
+				filled: true,
+				pickable: true,
+				autoHighlight: true,
+				opacity: fillOpacity,
+				colorScale: colorScale,
+				updateTriggers: {
+					getFillColor: [colorColumn, colorScale, fillOpacity, defaultColor, colorRange],
+					getLineWidth: [lineWidth],
+					getPolygon: [polygonColumn] // Update if polygon column changes
+				},
+				// Store the column selections as props to detect changes later
+				polygonColumn: polygonColumn,
+				idColumn: idColumn,
+				colorColumn: colorColumn,
+				labelColumn: labelColumn
+			};
+
+			// First check if a layer with this ID already exists (cleanup)
+			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (existingLayer) {
+				layers.remove(layer.id);
+			}
+
+			// Also remove any existing label layer
+			if (currentLabelLayerId) {
+				try {
+					layers.remove(currentLabelLayerId);
+					currentLabelLayerId = null;
+				} catch (e) {
+					console.warn(`Failed to remove label layer: ${e}`);
+				}
+			}
+
 			const newLayer = LayerFactory.create('polygon', {
 				id: layer.id,
+				props: layerProps
+			});
+
+			layers.add(newLayer);
+			console.log('Polygon layer created successfully');
+
+			if (showLabels && labelColumn) {
+				createLabelLayer();
+			}
+		} catch (error) {
+			console.error('Error creating polygon layer:', error);
+		}
+	}
+
+	function createLabelLayer() {
+		if (!showLabels || !labelColumn) return;
+
+		try {
+			const labelLayerId = `${layer.id}-labels`;
+
+			const labelLayer = LayerFactory.create('text', {
+				id: labelLayerId,
 				props: {
 					data: loadData(),
-					getPolygon: (d: any) => {
-						// Add validation for polygon data
-						if (!d || !d.polygon) {
-							console.warn('Invalid polygon data for getPolygon accessor:', d);
-							return [
-								[
-									[0, 0],
-									[0, 0],
-									[0, 0]
-								]
-							]; // Return a tiny triangle as default
-						}
-
-						// Handle different polygon formats
-						try {
-							// Direct Polygon object
-							if (d.polygon.type === 'Polygon' && d.polygon.coordinates) {
-								return d.polygon.coordinates;
-							}
-							// Feature with Polygon geometry
-							else if (
-								d.polygon.type === 'Feature' &&
-								d.polygon.geometry &&
-								d.polygon.geometry.type === 'Polygon'
-							) {
-								return d.polygon.geometry.coordinates;
-							}
-							// MultiPolygon
-							else if (d.polygon.type === 'MultiPolygon' && d.polygon.coordinates) {
-								// Flatten MultiPolygon coordinates to single Polygon for simplicity
-								return d.polygon.coordinates[0];
-							}
-							// Feature with MultiPolygon geometry
-							else if (
-								d.polygon.type === 'Feature' &&
-								d.polygon.geometry &&
-								d.polygon.geometry.type === 'MultiPolygon'
-							) {
-								return d.polygon.geometry.coordinates[0];
-							}
-
-							// Log the issue if we can't determine the polygon format
-							console.warn('Unknown polygon format:', d.polygon);
-							return [
-								[
-									[0, 0],
-									[0, 0],
-									[0, 0]
-								]
-							]; // Return a tiny triangle as default
-						} catch (e) {
-							console.error(`Error in getPolygon accessor for ID ${d.id}:`, e);
-							return [
-								[
-									[0, 0],
-									[0, 0],
-									[0, 0]
-								]
-							]; // Return a tiny triangle as default
-						}
+					getText: (d: any) => (d.label !== null && d.label !== undefined ? String(d.label) : ''),
+					getPosition: (d: any) => {
+						if (!d || !d.polygon) return [0, 0];
+						return getCentroid(d.polygon);
 					},
-					getFillColor: (d: any) => getPolygonFillColor(d),
-					getLineColor: [0, 0, 0, 200],
-					getLineWidth: lineWidth,
-					lineWidthUnits: 'pixels',
-					extruded: false,
-					filled: true,
+					getColor: [0, 0, 0, 255],
+					getSize: 12,
+					getAngle: 0,
+					getTextAnchor: 'middle',
+					getAlignmentBaseline: 'center',
+					getPixelOffset: [0, 0],
+					billboard: true,
+					sizeScale: 1,
+					fontFamily: 'Arial',
+					fontWeight: 'normal',
+					maxWidth: 200,
+					wordBreak: 'break-word',
 					pickable: true,
-					autoHighlight: true,
-					opacity: fillOpacity,
-					colorScale: colorScale,
 					updateTriggers: {
-						getFillColor: [colorColumn, colorScale, fillOpacity, defaultColor, colorRange],
-						getLineWidth: [lineWidth],
-						getPolygon: [polygonColumn] // Update if polygon column changes
-					},
-					onDataLoad: (info: any) => {
-						console.log('Polygon layer data loaded:', {
-							polygonCount: Array.isArray(info?.data) ? info.data.length : 0,
-							samplePolygon:
-								Array.isArray(info?.data) && info.data.length > 0
-									? {
-											id: info.data[0].id,
-											hasColor: info.data[0].colorValue !== null,
-											hasLabel: info.data[0].label !== null
-										}
-									: null
-						});
-					},
-					onHover: (info: any) => {
-						if (info && info.object) {
-							// Don't log every hover to avoid console spam
-							if (Math.random() < 0.1) {
-								// Only log ~10% of hovers
-								console.log('Polygon hover info:', {
-									id: info.object.id,
-									colorValue: info.object.colorValue,
-									label: info.object.label,
-									x: info.x,
-									y: info.y
-								});
-							}
-						}
+						getText: [labelColumn],
+						getPosition: [polygonColumn]
 					}
 				}
 			});
 
-			// Add the new polygon layer to the map
-			console.log(`Adding new polygon layer with ID: ${layer.id}`);
-			layers.add(newLayer);
-
-			//console.log(`Polygon layer updated successfully`);
-
-			// Remove the existing label layer if it exists
-			//const labelLayerId = `${layer.id}-labels`;
-			//if (currentLabelLayerId) {
-			//	console.log(`Removing existing label layer with ID: ${currentLabelLayerId}`);
-			//	try {
-			//		layers.remove(currentLabelLayerId);
-			//	} catch (e) {
-			//		console.warn(`Failed to remove label layer: ${e}`);
-			//	}
-			//}
-
-			// Create and add a new label layer if labels are enabled
-
-			// Update the current label layer ID
-			//	currentLabelLayerId = labelLayerId;
-			//	console.log(`Label layer updated successfully`);
-			//}
-
-			console.log('==================== POLYGON UPDATE COMPLETE ====================');
+			layers.add(labelLayer);
+			currentLabelLayerId = labelLayerId;
+			console.log('Label layer created successfully');
 		} catch (error) {
-			console.error('Error updating polygon layer:', error);
-			//@ts-expect-error
-			console.error('Error stack:', error.stack);
+			console.error('Error creating label layer:', error);
+		}
+	}
+
+	function updateOptionalProps(changedProps: Record<string, any>) {
+		try {
+			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				return;
+			}
+
+			const updateObj: Record<string, any> = { updateTriggers: {} };
+
+			if (
+				'colorColumn' in changedProps ||
+				'colorScale' in changedProps ||
+				'fillOpacity' in changedProps ||
+				'defaultColor' in changedProps
+			) {
+				updateObj.colorScale = colorScale;
+				updateObj.opacity = fillOpacity;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getFillColor: [colorColumn, colorScale, fillOpacity, defaultColor, colorRange]
+				};
+			}
+
+			// Handle line width changes
+			if ('lineWidth' in changedProps) {
+				updateObj.getLineWidth = lineWidth;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getLineWidth: [lineWidth]
+				};
+			}
+
+			if ('colorColumn' in changedProps) {
+				updateObj.colorColumn = colorColumn;
+			}
+
+			if ('labelColumn' in changedProps) {
+				updateObj.labelColumn = labelColumn;
+			}
+
+			if ('colorColumn' in changedProps || 'labelColumn' in changedProps) {
+				updateObj.data = loadData();
+			}
+
+			layers.updateProps(layer.id, updateObj);
+
+			if ('showLabels' in changedProps || 'labelColumn' in changedProps) {
+				if (currentLabelLayerId) {
+					try {
+						layers.remove(currentLabelLayerId);
+						currentLabelLayerId = null;
+					} catch (e) {
+						console.warn(`Failed to remove label layer: ${e}`);
+					}
+				}
+
+				if (showLabels && labelColumn) {
+					createLabelLayer();
+				}
+			} else if (
+				currentLabelLayerId &&
+				('polygonColumn' in changedProps ||
+					'colorColumn' in changedProps ||
+					'labelColumn' in changedProps)
+			) {
+				const labelUpdateObj = {
+					data: loadData(),
+					updateTriggers: {
+						getText: [labelColumn],
+						getPosition: [polygonColumn]
+					}
+				};
+
+				layers.updateProps(currentLabelLayerId, labelUpdateObj);
+			}
+		} catch (error) {
+			console.error('Error updating polygon layer props:', error);
 		}
 	}
 </script>

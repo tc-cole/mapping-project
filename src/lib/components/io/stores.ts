@@ -14,5 +14,4 @@ export const chosenDataset = writable<FileUpload | null>(
 	storeFromLocalStorage('chosenDataset', null)
 );
 
-export const deckGL = writable<any>(null);
 export const layers = new LayerStore();

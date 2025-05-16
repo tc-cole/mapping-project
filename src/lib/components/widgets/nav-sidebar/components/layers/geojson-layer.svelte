@@ -10,7 +10,10 @@
 
 	const CHUNK_SIZE = 100000;
 
+	// Required column
 	let geojsonColumn = $state<string | undefined>();
+
+	// Optional columns and visual parameters
 	let colorProperty = $state<string | null>(null);
 	let lineWidth = $state<number>(1);
 	let fillOpacity = $state<number>(0.5);
@@ -20,10 +23,24 @@
 	let extruded = $state<boolean>(false);
 	let elevationProperty = $state<string | null>(null);
 	let elevationScale = $state<number>(1);
+	let scaleType = $state<string>('linear');
+
+	// Previous values for tracking changes
+	let prevColorProperty = $state<string | null>(null);
+	let prevLineWidth = $state<number>(1);
+	let prevFillOpacity = $state<number>(0.5);
+	let prevLineOpacity = $state<number>(0.8);
+	let prevFillColorScale = $state<string>('viridis');
+	let prevLineColorScale = $state<string>('viridis');
+	let prevExtruded = $state<boolean>(false);
+	let prevElevationProperty = $state<string | null>(null);
+	let prevElevationScale = $state<number>(1);
+	let prevScaleType = $state<string>('linear');
+
+	// State variables
 	let hasInitialized = $state(false);
 	let dataLoaded = $state(false);
 	let colorRange = $state<[number, number]>([0, 1]);
-	let currentLayerId = $state<string | null>(null);
 
 	// Available color scales (consistent with other layers)
 	const colorScales = [
@@ -41,37 +58,106 @@
 
 	// Scale types
 	const scaleTypes = ['linear', 'log'];
-	let scaleType = $state<string>('linear');
 
 	let { layer } = $props();
 
 	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(geojsonColumn !== undefined);
 
-	// Effect to update map when configuration changes
+	// Create a layer when required column is selected
 	$effect(() => {
-		console.log('Effect checking required columns for GeoJSON Layer:', {
-			geojsonColumn
-		});
-
 		if (requiredColumnsSelected && !hasInitialized) {
 			console.log('Initializing GeoJSON layer - required column selected');
-			updateMapLayers();
+			createGeoJSONLayer();
 			hasInitialized = true;
 		}
 	});
 
-	// Update effect whenever key parameters change
+	// Re-create layer if geojsonColumn changes
 	$effect(() => {
-		if (hasInitialized) {
-			console.log('Updating GeoJSON layer due to parameter change');
-			updateMapLayers();
+		// Only run after initial creation and when main column changes
+		if (!hasInitialized) {
+			return;
+		}
+
+		// Find the current layer
+		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+
+		// Recreate layer if geojson column has changed
+		if (currentLayer && currentLayer.props.geojsonColumn !== geojsonColumn) {
+			console.log('GeoJSON column changed, recreating layer');
+			createGeoJSONLayer();
 		}
 	});
 
-	// Enhanced GeoJSON transformer function with detailed debugging
+	// Update props when optional parameters change
+	$effect(() => {
+		// Only run after initial layer creation
+		if (!hasInitialized || !requiredColumnsSelected) {
+			return;
+		}
+
+		// Detect which properties have changed
+		const changedProps: Record<string, any> = {};
+
+		if (colorProperty !== prevColorProperty) {
+			changedProps.colorProperty = colorProperty;
+			prevColorProperty = colorProperty;
+		}
+
+		if (lineWidth !== prevLineWidth) {
+			changedProps.lineWidth = lineWidth;
+			prevLineWidth = lineWidth;
+		}
+
+		if (fillOpacity !== prevFillOpacity) {
+			changedProps.fillOpacity = fillOpacity;
+			prevFillOpacity = fillOpacity;
+		}
+
+		if (lineOpacity !== prevLineOpacity) {
+			changedProps.lineOpacity = lineOpacity;
+			prevLineOpacity = lineOpacity;
+		}
+
+		if (fillColorScale !== prevFillColorScale) {
+			changedProps.fillColorScale = fillColorScale;
+			prevFillColorScale = fillColorScale;
+		}
+
+		if (lineColorScale !== prevLineColorScale) {
+			changedProps.lineColorScale = lineColorScale;
+			prevLineColorScale = lineColorScale;
+		}
+
+		if (extruded !== prevExtruded) {
+			changedProps.extruded = extruded;
+			prevExtruded = extruded;
+		}
+
+		if (elevationProperty !== prevElevationProperty) {
+			changedProps.elevationProperty = elevationProperty;
+			prevElevationProperty = elevationProperty;
+		}
+
+		if (elevationScale !== prevElevationScale) {
+			changedProps.elevationScale = elevationScale;
+			prevElevationScale = elevationScale;
+		}
+
+		if (scaleType !== prevScaleType) {
+			changedProps.scaleType = scaleType;
+			prevScaleType = scaleType;
+		}
+
+		// Only update if something changed
+		if (Object.keys(changedProps).length > 0) {
+			updateOptionalProps(changedProps);
+		}
+	});
+
+	// Enhanced GeoJSON transformer function
 	async function* transformRows(rows: AsyncIterable<any[]>) {
-		console.log('==================== GEOJSON TRANSFORM START ====================');
 		console.log('Starting GeoJSON transformRows with columns:', {
 			geojson: geojsonColumn,
 			color: colorProperty,
@@ -94,32 +180,13 @@
 
 		try {
 			// First yield an empty feature collection to initialize
-			console.log('Yielding initial empty FeatureCollection');
 			yield { type: 'FeatureCollection', features: [] };
 
 			// Process batches from DuckDB
 			for await (const batch of rows) {
 				batchCount++;
-				console.log(`\n----- GEOJSON BATCH ${batchCount} -----`);
-				console.log(`Received batch with ${batch.length} rows`);
+				console.log(`Processing GeoJSON batch ${batchCount} with ${batch.length} rows`);
 				totalRowsProcessed += batch.length;
-
-				// Log the first row of each batch to see the raw format
-				if (batch.length > 0) {
-					console.log('First row in batch (raw):', batch[0]);
-					console.log(
-						//@ts-expect-error
-						`GeoJSON column in first row: ${batch[0][geojsonColumn]?.substring?.(0, 100)}${batch[0][geojsonColumn]?.length > 100 ? '...' : ''}`
-					);
-					if (colorProperty) {
-						console.log(`Color property in first row: ${batch[0][colorProperty]}`);
-					}
-					if (elevationProperty) {
-						console.log(`Elevation property in first row: ${batch[0][elevationProperty]}`);
-					}
-				} else {
-					console.log('Batch is empty');
-				}
 
 				// Process each row in the batch
 				const batchFeatures = [];
@@ -129,9 +196,6 @@
 					//@ts-expect-error
 					if (!row || row[geojsonColumn] === null || row[geojsonColumn] === undefined) {
 						nullGeoJsonCount++;
-						if (nullGeoJsonCount <= 5) {
-							console.log('Skipping row with null/undefined GeoJSON:', row);
-						}
 						continue;
 					}
 
@@ -141,21 +205,12 @@
 
 						// Check if the GeoJSON is stored as a string or object
 						//@ts-expect-error
-
 						if (typeof row[geojsonColumn] === 'string') {
 							try {
-								console.log(`Parsing GeoJSON string from row ${batchFeatures.length}`); //@ts-expect-error
+								//@ts-expect-error
 								geojson = JSON.parse(row[geojsonColumn]);
 							} catch (parseError) {
 								parseErrorCount++;
-								if (parseErrorCount <= 5) {
-									console.error(`Failed to parse GeoJSON string:`, parseError);
-									console.log(
-										//@ts-expect-error
-
-										`Invalid GeoJSON string (first 200 chars): ${row[geojsonColumn].substring(0, 200)}`
-									);
-								}
 								continue;
 							}
 						} else {
@@ -167,27 +222,12 @@
 						// Basic validation
 						if (!geojson || typeof geojson !== 'object') {
 							invalidGeoJsonCount++;
-							if (invalidGeoJsonCount <= 5) {
-								console.error(`Invalid GeoJSON data, not an object:`, geojson);
-							}
 							continue;
 						}
 
 						// Process based on GeoJSON type
 						if (geojson.type === 'Feature') {
 							featureCount++;
-
-							// Log the feature structure for the first few features
-							if (featureCount <= 2) {
-								console.log(`Feature example:`, {
-									type: geojson.type,
-									geometry: {
-										type: geojson.geometry?.type,
-										coordinatesLength: geojson.geometry?.coordinates?.length
-									},
-									properties: geojson.properties
-								});
-							}
 
 							// Add properties if they don't exist
 							if (!geojson.properties) {
@@ -204,13 +244,6 @@
 								if (!isNaN(colorValue)) {
 									geojson.properties.colorValue = colorValue;
 									colorValues.push(colorValue);
-
-									// Log some color values for debugging
-									if (colorValues.length <= 5 || colorValues.length % 1000 === 0) {
-										console.log(`Added color value: ${colorValue} to feature`);
-									}
-								} else {
-									console.warn(`Invalid color value (not a number): ${row[colorProperty]}`);
 								}
 							}
 
@@ -225,13 +258,6 @@
 								if (!isNaN(elevationValue)) {
 									geojson.properties.elevationValue = elevationValue;
 									elevationValues.push(elevationValue);
-
-									// Log some elevation values for debugging
-									if (elevationValues.length <= 5 || elevationValues.length % 1000 === 0) {
-										console.log(`Added elevation value: ${elevationValue} to feature`);
-									}
-								} else {
-									console.warn(`Invalid elevation value (not a number): ${row[elevationProperty]}`);
 								}
 							}
 
@@ -251,13 +277,6 @@
 							].includes(geojson.type)
 						) {
 							geometryCount++;
-
-							// Log the geometry structure for the first few geometries
-							if (geometryCount <= 2) {
-								console.log(`Geometry example (type: ${geojson.type}):`, {
-									coordinatesLength: geojson.coordinates?.length
-								});
-							}
 
 							const properties: any = {};
 
@@ -302,25 +321,10 @@
 						else if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
 							featureCollectionCount++;
 
-							// Log feature collection info
-							if (featureCollectionCount <= 2) {
-								console.log(`FeatureCollection example: ${geojson.features.length} features`);
-								if (geojson.features.length > 0) {
-									console.log(`First feature in collection:`, {
-										type: geojson.features[0]?.type,
-										geometry: {
-											type: geojson.features[0]?.geometry?.type,
-											coordinatesLength: geojson.features[0]?.geometry?.coordinates?.length
-										}
-									});
-								}
-							}
-
 							// Add properties to each feature in the collection
 							const processedFeatures = geojson.features
 								.filter((feature: any) => {
 									if (!feature || !feature.type || feature.type !== 'Feature') {
-										console.warn('Invalid feature in FeatureCollection:', feature);
 										return false;
 									}
 									return true;
@@ -364,21 +368,12 @@
 							batchFeatures.push(...processedFeatures);
 						} else {
 							invalidGeoJsonCount++;
-							if (invalidGeoJsonCount <= 5) {
-								console.error(`Unrecognized GeoJSON type:`, geojson.type);
-							}
 						}
 					} catch (e) {
-						console.error('Error processing GeoJSON:', e);
 						parseErrorCount++;
 						continue;
 					}
 				}
-
-				// Log batch summary
-				console.log(
-					`Batch ${batchCount} results: Processed ${batchFeatures.length} features from ${batch.length} rows`
-				);
 
 				// Add batch features to accumulated collection
 				allFeatures = [...allFeatures, ...batchFeatures];
@@ -392,38 +387,11 @@
 					dataLoaded = true;
 				}
 
-				// Log the total features processed so far
-				console.log(
-					`TOTAL: ${allFeatures.length} valid features so far after ${batchCount} batches`
-				);
-
 				// Create feature collection for this batch
 				const featureCollection = {
 					type: 'FeatureCollection',
 					features: allFeatures
 				};
-
-				// Log feature collection stats
-				console.log(`Yielding FeatureCollection with ${allFeatures.length} features`);
-
-				// Sample feature types in the collection
-				const featureTypes = new Set();
-				const geometryTypes = new Set();
-
-				// Sample up to 100 features for type checking
-				const sampleSize = Math.min(allFeatures.length, 100);
-				for (let i = 0; i < sampleSize; i++) {
-					const feature = allFeatures[i];
-					if (feature && feature.type) {
-						featureTypes.add(feature.type);
-					}
-					if (feature && feature.geometry && feature.geometry.type) {
-						geometryTypes.add(feature.geometry.type);
-					}
-				}
-
-				console.log(`Feature types in collection: ${Array.from(featureTypes).join(', ')}`);
-				console.log(`Geometry types in collection: ${Array.from(geometryTypes).join(', ')}`);
 
 				// Yield feature collection
 				yield featureCollection;
@@ -435,36 +403,16 @@
 				}
 			}
 
-			// Final statistics
-			console.log('\n========== GEOJSON TRANSFORM SUMMARY ==========');
-			console.log(`Total batches processed: ${batchCount}`);
-			console.log(`Total rows processed: ${totalRowsProcessed}`);
-			console.log(`Valid features: ${validFeatureCount}`);
-			console.log(`Feature types processed:`);
-			console.log(` - Features: ${featureCount}`);
-			console.log(` - Geometries wrapped as features: ${geometryCount}`);
-			console.log(` - FeatureCollections processed: ${featureCollectionCount}`);
-			console.log(`Invalid data counts:`);
-			console.log(` - Null/undefined GeoJSON: ${nullGeoJsonCount}`);
-			console.log(` - Invalid GeoJSON format: ${invalidGeoJsonCount}`);
-			console.log(` - Parse errors: ${parseErrorCount}`);
-			console.log(`Color values: ${colorValues.length}`);
-			console.log(`Elevation values: ${elevationValues.length}`);
-			console.log(`Color range: [${colorRange[0]}, ${colorRange[1]}]`);
-			console.log('==================== GEOJSON TRANSFORM END ====================');
+			console.log(`GeoJSON transform complete: ${validFeatureCount} features processed`);
 		} catch (error) {
-			console.error('ERROR in GeoJSON transformRows:', error); //@ts-expect-error
-			console.error('Error stack:', error.stack);
-
+			console.error('ERROR in GeoJSON transformRows:', error);
 			// In case of error, yield what we have so far
 			if (allFeatures.length > 0) {
-				console.log(`Error occurred, but yielding ${allFeatures.length} features collected so far`);
 				yield {
 					type: 'FeatureCollection',
 					features: allFeatures
 				};
 			} else {
-				console.log('Error occurred and no features collected, yielding empty FeatureCollection');
 				yield {
 					type: 'FeatureCollection',
 					features: []
@@ -473,24 +421,18 @@
 		}
 	}
 
-	// Enhanced loadData function with better error handling and logging
+	// Load data with async generator
 	async function* loadData() {
 		try {
-			console.log('==================== GEOJSON LOAD DATA START ====================');
 			// Initial empty dataset
-			console.log('Yielding initial empty FeatureCollection from loadData');
 			yield { type: 'FeatureCollection', features: [] };
 
 			// Get database instance
-			console.log('Getting database instance for GeoJSON layer');
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
-			console.log('Database client initialized for GeoJSON layer');
 
 			if ($chosenDataset !== null) {
-				console.log('Processing dataset for GeoJSON layer:', $chosenDataset);
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
-				console.log('Cleaned filename:', filename);
 
 				// Build column list for query
 				const columnsList = [geojsonColumn];
@@ -504,197 +446,206 @@
 				const columnsStr = columnsList.join(', ');
 				console.log('GeoJSON layer query columns:', columnsStr);
 
-				// Main query with all data
-				console.log(`Executing GeoJSON layer stream query: SELECT ${columnsStr} FROM ${filename}`);
-
 				try {
 					const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
-					console.log('GeoJSON layer stream query executed successfully');
-					console.log('GeoJSON layer stream schema:', stream.schema);
-
-					// Log the schema details
-					if (stream.schema) {
-						console.log('Column details from schema for GeoJSON layer:');
-						stream.schema.forEach((field) => {
-							console.log(
-								` - ${field.name}: ${field.type} (${field.databaseType}) ${field.nullable ? 'nullable' : 'not nullable'}`
-							);
-						});
-					}
 
 					// Transform the rows and yield the results
-					console.log('Starting GeoJSON data transformation...');
 					const readRowsGenerator = stream.readRows();
 					yield* transformRows(readRowsGenerator);
 				} catch (streamError) {
-					console.error('Error in GeoJSON layer stream query:', streamError); //@ts-expect-error
-					console.error('Stream error stack:', streamError.stack);
+					console.error('Error in GeoJSON layer stream query:', streamError);
 					yield { type: 'FeatureCollection', features: [] };
 				}
 			} else {
 				console.log('No dataset chosen for GeoJSON layer');
 				yield { type: 'FeatureCollection', features: [] };
 			}
-			console.log('==================== GEOJSON LOAD DATA END ====================');
 		} catch (error) {
-			console.error('Error in GeoJSON loadData:', error); //@ts-expect-error
-
-			console.error('Error stack:', error.stack);
+			console.error('Error in GeoJSON loadData:', error);
 			// Return empty GeoJSON in case of error
 			yield { type: 'FeatureCollection', features: [] };
 		}
 	}
 
-	// Updated function to use add/remove pattern instead of updateProps
-	function updateMapLayers() {
-		console.log('==================== UPDATE GEOJSON LAYER ====================');
-		console.log('GeoJSON layer columns selected:', {
-			geojson: geojsonColumn,
-			color: colorProperty,
-			elevation: elevationProperty
-		});
-		console.log('GeoJSON layer style settings:', {
-			filled: true,
-			stroked: true,
-			lineWidth: lineWidth,
-			fillOpacity: fillOpacity,
-			lineOpacity: lineOpacity,
-			fillColorScale: fillColorScale,
-			lineColorScale: lineColorScale,
-			extruded: extruded,
-			elevationScale: elevationScale,
-			scaleType: scaleType,
-			colorRange: colorRange
-		});
-
+	// Create initial GeoJSON layer
+	function createGeoJSONLayer() {
 		try {
-			// Remove existing layer if it exists
-			if (layer.id) {
+			console.log('Creating new GeoJSON layer');
+
+			// Define the initial layer properties
+			const layerProps = {
+				data: loadData(),
+				filled: true,
+				stroked: true,
+				lineWidthScale: lineWidth,
+				getFillColor: (f: any) => {
+					// Use colorProperty if available, otherwise use default color
+					if (
+						colorProperty &&
+						f.properties?.colorValue !== undefined &&
+						f.properties?.colorValue !== null
+					) {
+						// This will be handled by the layer's color mapping
+						return [140, 170, 180, Math.floor(fillOpacity * 255)];
+					} else {
+						return [140, 170, 180, Math.floor(fillOpacity * 255)];
+					}
+				},
+				getLineColor: (f: any) => {
+					// Use colorProperty if available, otherwise use default color
+					if (
+						colorProperty &&
+						f.properties?.colorValue !== undefined &&
+						f.properties?.colorValue !== null
+					) {
+						// This will be handled by the layer's color mapping
+						return [0, 0, 0, Math.floor(lineOpacity * 255)];
+					} else {
+						return [0, 0, 0, Math.floor(lineOpacity * 255)];
+					}
+				},
+				getColorValue: (f: any) => {
+					return f.properties?.colorValue;
+				},
+				getElevation: (f: any) => {
+					if (!extruded) return 0;
+					return f.properties?.elevationValue || 0;
+				},
+				elevationScale: elevationScale,
+				extruded: extruded,
+				wireframe: false,
+				pickable: true,
+				autoHighlight: true,
+				pointRadiusScale: 5,
+				lineJointRounded: true,
+				fillColorScale: fillColorScale,
+				lineColorScale: lineColorScale,
+				colorScaleType: scaleType,
+				colorDomain: colorProperty ? colorRange : undefined,
+				updateTriggers: {
+					getFillColor: [fillColorScale, fillOpacity, colorProperty, colorRange],
+					getLineColor: [lineColorScale, lineOpacity, colorProperty, colorRange],
+					getElevation: [extruded, elevationProperty, elevationScale]
+				},
+				// Store the column selections as props to detect changes later
+				geojsonColumn: geojsonColumn,
+				colorProperty: colorProperty,
+				elevationProperty: elevationProperty
+			};
+
+			// First check if a layer with this ID already exists (cleanup)
+			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (existingLayer) {
+				console.log(`Removing existing layer with ID: ${layer.id}`);
 				layers.remove(layer.id);
-				currentLayerId = null;
-			} else {
-				console.log(`Initial layer creation, no previous layer to remove`);
 			}
 
-			// Create a new GeoJSON layer using LayerFactory
-			console.log(`Creating new GeoJSON layer`);
-
+			// Create a new GeoJSON layer
 			const newLayer = LayerFactory.create('geojson', {
-				props: {
-					data: loadData(),
-					filled: true,
-					stroked: true,
-					lineWidthScale: lineWidth,
-					getFillColor: (f: any) => {
-						// Use colorProperty if available, otherwise use default color
-						if (
-							colorProperty &&
-							f.properties?.colorValue !== undefined &&
-							f.properties?.colorValue !== null
-						) {
-							// This will be handled by the layer's color mapping
-							return [140, 170, 180, Math.floor(fillOpacity * 255)];
-						} else {
-							return [140, 170, 180, Math.floor(fillOpacity * 255)];
-						}
-					},
-					getLineColor: (f: any) => {
-						// Use colorProperty if available, otherwise use default color
-						if (
-							colorProperty &&
-							f.properties?.colorValue !== undefined &&
-							f.properties?.colorValue !== null
-						) {
-							// This will be handled by the layer's color mapping
-							return [0, 0, 0, Math.floor(lineOpacity * 255)];
-						} else {
-							return [0, 0, 0, Math.floor(lineOpacity * 255)];
-						}
-					},
-					getColorValue: (f: any) => {
-						const colorValue = f.properties?.colorValue;
-						// Periodically log color values for debugging
-						if (Math.random() < 0.001) {
-							// Log about 0.1% of features
-							console.log(`GeoJSON feature color value:`, {
-								colorValue: colorValue,
-								colorRange: colorRange
-							});
-						}
-						return colorValue;
-					},
-					getElevation: (f: any) => {
-						if (!extruded) return 0;
-
-						const elevationValue = f.properties?.elevationValue || 0;
-						// Periodically log elevation values for debugging
-						if (Math.random() < 0.001) {
-							// Log about 0.1% of features
-							console.log(`GeoJSON feature elevation:`, {
-								elevationValue: elevationValue,
-								elevationScale: elevationScale
-							});
-						}
-						return elevationValue;
-					},
-					elevationScale: elevationScale,
-					extruded: extruded,
-					wireframe: false,
-					pickable: true,
-					autoHighlight: true,
-					pointRadiusScale: 5,
-					lineJointRounded: true,
-					fillColorScale: fillColorScale,
-					lineColorScale: lineColorScale,
-					colorScaleType: scaleType,
-					colorDomain: colorProperty ? colorRange : undefined,
-					updateTriggers: {
-						getFillColor: [fillColorScale, fillOpacity, colorProperty, colorRange],
-						getLineColor: [lineColorScale, lineOpacity, colorProperty, colorRange],
-						getElevation: [extruded, elevationProperty, elevationScale]
-					},
-					// Add callbacks for visibility debugging
-					onDataLoad: (info: any) => {
-						console.log('GeoJSON layer data loaded:', {
-							featureCount: info?.data?.features?.length || 0,
-							sampleFeature: info?.data?.features?.[0]
-								? {
-										type: info.data.features[0].type,
-										geometryType: info.data.features[0].geometry?.type
-									}
-								: null
-						});
-					},
-					onHover: (info: any) => {
-						if (info && info.object) {
-							// Don't log every hover to avoid console spam
-							if (Math.random() < 0.1) {
-								// Only log ~10% of hovers
-								console.log('GeoJSON hover info:', {
-									featureType: info.object.type,
-									geometryType: info.object.geometry?.type,
-									properties: info.object.properties,
-									x: info.x,
-									y: info.y
-								});
-							}
-						}
-					}
-				}
+				id: layer.id,
+				props: layerProps
 			});
 
-			// Store the new layer ID for future updates
-			currentLayerId = newLayer.id;
-
-			// Add the new layer to the map
-			console.log(`Adding new GeoJSON layer with ID: ${newLayer.id}`);
+			// Add the new layer
 			layers.add(newLayer);
-
-			console.log(`GeoJSON layer updated successfully using add/remove pattern`);
-			console.log('==================== GEOJSON UPDATE COMPLETE ====================');
+			console.log('GeoJSON layer created successfully');
 		} catch (error) {
-			console.error('Error updating GeoJSON layer:', error); //@ts-expect-error
-			console.error('Error stack:', error.stack);
+			console.error('Error creating GeoJSON layer:', error);
+		}
+	}
+
+	// Update layer props when optional parameters change
+	function updateOptionalProps(changedProps: Record<string, any>) {
+		try {
+			// Find the current layer
+			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				return;
+			}
+
+			// Base update object with updateTriggers
+			const updateObj: Record<string, any> = { updateTriggers: {} };
+
+			// Handle fill color changes
+			if (
+				'colorProperty' in changedProps ||
+				'fillColorScale' in changedProps ||
+				'fillOpacity' in changedProps
+			) {
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getFillColor: [fillColorScale, fillOpacity, colorProperty, colorRange]
+				};
+				updateObj.fillColorScale = fillColorScale;
+			}
+
+			// Handle line color changes
+			if (
+				'colorProperty' in changedProps ||
+				'lineColorScale' in changedProps ||
+				'lineOpacity' in changedProps
+			) {
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getLineColor: [lineColorScale, lineOpacity, colorProperty, colorRange]
+				};
+				updateObj.lineColorScale = lineColorScale;
+			}
+
+			// Handle line width changes
+			if ('lineWidth' in changedProps) {
+				updateObj.lineWidthScale = lineWidth;
+			}
+
+			// Handle opacity changes
+			if ('fillOpacity' in changedProps) {
+				// The opacity is handled within getFillColor
+			}
+
+			if ('lineOpacity' in changedProps) {
+				// The opacity is handled within getLineColor
+			}
+
+			// Handle elevation changes
+			if (
+				'extruded' in changedProps ||
+				'elevationProperty' in changedProps ||
+				'elevationScale' in changedProps
+			) {
+				updateObj.extruded = extruded;
+				updateObj.elevationScale = elevationScale;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getElevation: [extruded, elevationProperty, elevationScale]
+				};
+			}
+
+			// Handle scale type changes
+			if ('scaleType' in changedProps) {
+				updateObj.colorScaleType = scaleType;
+			}
+
+			// Update column references
+			if ('colorProperty' in changedProps) {
+				updateObj.colorProperty = colorProperty;
+				updateObj.colorDomain = colorProperty ? colorRange : undefined;
+			}
+
+			if ('elevationProperty' in changedProps) {
+				updateObj.elevationProperty = elevationProperty;
+			}
+
+			// If data-related properties have changed, reload the data
+			if ('colorProperty' in changedProps || 'elevationProperty' in changedProps) {
+				updateObj.data = loadData();
+			}
+
+			// Apply the updates
+			console.log('Updating GeoJSON layer properties:', Object.keys(changedProps).join(', '));
+			layers.updateProps(layer.id, updateObj);
+		} catch (error) {
+			console.error('Error updating GeoJSON layer props:', error);
 		}
 	}
 </script>

@@ -24,6 +24,14 @@
 	let colorScale = $state<string>('viridis');
 	let defaultColor = $state<[number, number, number]>([0, 0, 255]); // Default blue color
 
+	// Previous values for tracking changes
+	let prevColorColumn = $state<string | null>(null);
+	let prevWidthColumn = $state<string | null>(null);
+	let prevOpacity = $state<number>(0.8);
+	let prevLineWidth = $state<number>(2);
+	let prevColorScale = $state<string>('viridis');
+	let prevDefaultColor = $state<[number, number, number]>([0, 0, 255]);
+
 	// Available color scales
 	const colorScales = [
 		'viridis',
@@ -53,18 +61,80 @@
 			idColumn !== undefined
 	);
 
-	// Initialize when all required columns are selected
+	// Create a layer when all required columns are selected
 	$effect(() => {
 		if (requiredColumnsSelected && !hasInitialized) {
-			updateMapLayers();
+			console.log('Initializing line layer - required columns selected');
+			createLineLayer();
 			hasInitialized = true;
 		}
 	});
 
-	// Update when parameters change
+	// Re-create layer if any of the main columns change
 	$effect(() => {
-		if (hasInitialized && requiredColumnsSelected) {
-			updateMapLayers();
+		// Only run after initial creation and when columns change
+		if (!hasInitialized) {
+			return;
+		}
+
+		// Find the current layer
+		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+
+		// Recreate layer if main columns have changed
+		if (
+			currentLayer &&
+			(currentLayer.props.sourcePositionColumn !== sourcePositionColumn ||
+				currentLayer.props.targetPositionColumn !== targetPositionColumn ||
+				currentLayer.props.idColumn !== idColumn)
+		) {
+			console.log('Main columns changed, recreating line layer');
+			createLineLayer();
+		}
+	});
+
+	// Update props when optional parameters change
+	$effect(() => {
+		// Only run after initial layer creation
+		if (!hasInitialized || !requiredColumnsSelected) {
+			return;
+		}
+
+		// Detect which properties have changed
+		const changedProps: Record<string, any> = {};
+
+		if (colorColumn !== prevColorColumn) {
+			changedProps.colorColumn = colorColumn;
+			prevColorColumn = colorColumn;
+		}
+
+		if (widthColumn !== prevWidthColumn) {
+			changedProps.widthColumn = widthColumn;
+			prevWidthColumn = widthColumn;
+		}
+
+		if (opacity !== prevOpacity) {
+			changedProps.opacity = opacity;
+			prevOpacity = opacity;
+		}
+
+		if (lineWidth !== prevLineWidth) {
+			changedProps.lineWidth = lineWidth;
+			prevLineWidth = lineWidth;
+		}
+
+		if (colorScale !== prevColorScale) {
+			changedProps.colorScale = colorScale;
+			prevColorScale = colorScale;
+		}
+
+		if (defaultColor !== prevDefaultColor) {
+			changedProps.defaultColor = defaultColor;
+			prevDefaultColor = defaultColor;
+		}
+
+		// Only update if something changed
+		if (Object.keys(changedProps).length > 0) {
+			updateOptionalProps(changedProps);
 		}
 	});
 
@@ -177,8 +247,7 @@
 				yield [];
 			}
 		} catch (error) {
-			//@ts-expect-error
-			console.error('ERROR in line transformRows:', error, error.stack);
+			console.error('ERROR in line transformRows:', error);
 
 			// In case of error, yield what we have so far
 			if (allLines.length > 0) {
@@ -189,19 +258,15 @@
 		}
 	}
 
-	// Function to parse position data in various formats
 	function parsePosition(positionData: any): [number, number] | null {
 		try {
-			// If it's already an array with two numbers
 			if (Array.isArray(positionData) && positionData.length >= 2) {
 				const x = Number(positionData[0]);
 				const y = Number(positionData[1]);
 				if (!isNaN(x) && !isNaN(y)) return [x, y];
 			}
 
-			// If it's a string, try to parse as JSON
 			if (typeof positionData === 'string') {
-				// Check if it's a JSON array
 				if (positionData.startsWith('[') && positionData.endsWith(']')) {
 					const parsed = JSON.parse(positionData);
 					if (Array.isArray(parsed) && parsed.length >= 2) {
@@ -211,7 +276,6 @@
 					}
 				}
 
-				// Check if it's a comma-separated pair
 				if (positionData.includes(',')) {
 					const parts = positionData.split(',').map((p) => p.trim());
 					if (parts.length >= 2) {
@@ -221,7 +285,6 @@
 					}
 				}
 
-				// Check if it's a GeoJSON Point
 				if (positionData.includes('coordinates') && positionData.includes('type')) {
 					try {
 						const parsed = JSON.parse(positionData);
@@ -233,7 +296,7 @@
 							return [parsed.coordinates[0], parsed.coordinates[1]];
 						}
 					} catch (e) {
-						// Not valid JSON, continue trying other formats
+						console.warn('Warning, not valid JSON', e);
 					}
 				}
 			}
@@ -270,13 +333,10 @@
 		}
 	}
 
-	// Load data from DuckDB
 	async function* loadData() {
 		try {
-			// Initial empty dataset
 			yield [];
 
-			// Get database instance
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
@@ -295,72 +355,139 @@
 					const readRowsGenerator = stream.readRows();
 					yield* transformRows(readRowsGenerator);
 				} catch (streamError) {
-					//@ts-expect-error
-					console.error('Error in line layer stream query:', streamError, streamError.stack);
+					console.error('Error in line layer stream query:', streamError);
 					yield [];
 				}
 			} else {
 				yield [];
 			}
 		} catch (error) {
-			//@ts-expect-error
-			console.error('Error in line loadData:', error, error.stack);
+			console.error('Error in line loadData:', error);
 			yield [];
 		}
 	}
 
-	// Update line layers on the map
-	function updateMapLayers() {
+	// Create initial line layer
+	function createLineLayer() {
 		try {
-			// Remove the existing layer
-			layers.remove(layer.id);
+			console.log('Creating new line layer');
 
-			// Create a new line layer with updated properties
+			// Define the initial layer properties
+			const layerProps = {
+				data: loadData(),
+				getSourcePosition: (d: any) => {
+					if (!d || !d.sourcePosition) return [0, 0];
+					return d.sourcePosition;
+				},
+				getTargetPosition: (d: any) => {
+					if (!d || !d.targetPosition) return [0, 0];
+					return d.targetPosition;
+				},
+				getColor: (d: any) => {
+					// Dynamic color based on the selected color column
+					if (!colorColumn || d.colorValue === null || d.colorValue === undefined) {
+						return [...defaultColor, Math.floor(opacity * 255)];
+					}
+					return [d.colorValue, Math.floor(opacity * 255)];
+				},
+				getWidth: (d: any) => {
+					// Dynamic width based on the selected width column
+					if (!widthColumn || d.widthValue === null || d.widthValue === undefined) {
+						return lineWidth;
+					}
+					return d.widthValue;
+				},
+				widthUnits: 'pixels',
+				pickable: true,
+				autoHighlight: true,
+				opacity: opacity,
+				colorScale: colorScale,
+				updateTriggers: {
+					getColor: [colorColumn, colorScale, opacity, defaultColor, colorRange],
+					getWidth: [widthColumn, lineWidth, widthRange],
+					getSourcePosition: [sourcePositionColumn],
+					getTargetPosition: [targetPositionColumn]
+				},
+
+				sourcePositionColumn: sourcePositionColumn,
+				targetPositionColumn: targetPositionColumn,
+				idColumn: idColumn,
+				colorColumn: colorColumn,
+				widthColumn: widthColumn
+			};
+
+			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (existingLayer) {
+				console.log(`Removing existing layer with ID: ${layer.id}`);
+				layers.remove(layer.id);
+			}
+
+			// Create a new line layer
 			const newLayer = LayerFactory.create('line', {
 				id: layer.id,
-				props: {
-					data: loadData(),
-					getSourcePosition: (d: any) => {
-						if (!d || !d.sourcePosition) return [0, 0];
-						return d.sourcePosition;
-					},
-					getTargetPosition: (d: any) => {
-						if (!d || !d.targetPosition) return [0, 0];
-						return d.targetPosition;
-					},
-					getColor: (d: any) => {
-						// Dynamic color based on the selected color column
-						if (!colorColumn || d.colorValue === null || d.colorValue === undefined) {
-							return [...defaultColor, Math.floor(opacity * 255)];
-						}
-						return [d.colorValue, Math.floor(opacity * 255)];
-					},
-					getWidth: (d: any) => {
-						// Dynamic width based on the selected width column
-						if (!widthColumn || d.widthValue === null || d.widthValue === undefined) {
-							return lineWidth;
-						}
-						return d.widthValue;
-					},
-					widthUnits: 'pixels',
-					pickable: true,
-					autoHighlight: true,
-					opacity: opacity,
-					colorScale: colorScale,
-					updateTriggers: {
-						getColor: [colorColumn, colorScale, opacity, defaultColor, colorRange],
-						getWidth: [widthColumn, lineWidth, widthRange],
-						getSourcePosition: [sourcePositionColumn],
-						getTargetPosition: [targetPositionColumn]
-					}
-				}
+				props: layerProps
 			});
 
-			// Add the new layer to the map
+			// Add the new layer
 			layers.add(newLayer);
 		} catch (error) {
-			//@ts-expect-error
-			console.error('Error updating line layer:', error, error.stack);
+			console.error('Error creating line layer:', error);
+		}
+	}
+
+	// Update layer props when optional parameters change
+	function updateOptionalProps(changedProps: Record<string, any>) {
+		try {
+			// Find the current layer
+			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				return;
+			}
+
+			// Base update object with updateTriggers
+			const updateObj: Record<string, any> = { updateTriggers: {} };
+
+			// Handle color changes
+			if (
+				'colorColumn' in changedProps ||
+				'colorScale' in changedProps ||
+				'opacity' in changedProps ||
+				'defaultColor' in changedProps
+			) {
+				updateObj.colorScale = colorScale;
+				updateObj.opacity = opacity;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getColor: [colorColumn, colorScale, opacity, defaultColor, colorRange]
+				};
+			}
+
+			// Handle width changes
+			if ('widthColumn' in changedProps || 'lineWidth' in changedProps) {
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getWidth: [widthColumn, lineWidth, widthRange]
+				};
+			}
+
+			// Update column references
+			if ('colorColumn' in changedProps) {
+				updateObj.colorColumn = colorColumn;
+			}
+
+			if ('widthColumn' in changedProps) {
+				updateObj.widthColumn = widthColumn;
+			}
+
+			// If data-related properties have changed, reload the data
+			if ('colorColumn' in changedProps || 'widthColumn' in changedProps) {
+				updateObj.data = loadData();
+			}
+
+			layers.updateProps(layer.id, updateObj);
+		} catch (error) {
+			console.error('Error updating line layer props:', error);
 		}
 	}
 </script>

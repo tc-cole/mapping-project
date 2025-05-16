@@ -7,8 +7,6 @@
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { flyTo } from './utils/flyto';
 
-	import { onMount } from 'svelte';
-
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 
@@ -46,7 +44,7 @@
 	// Used to store pre-calculated values for size and color ranges
 	let sizeRange = [0, 1];
 	let colorRange = [0, 1];
-	let dataLoaded = $state(false);
+
 	let hasInitialized = $state(false);
 
 	// Use derived state for checking if required columns are selected
@@ -54,11 +52,99 @@
 		latitudeColumn !== undefined && longitudeColumn !== undefined
 	);
 
-	// Derive the map layer configuration based on all input parameters
 	$effect(() => {
 		if (requiredColumnsSelected && !hasInitialized) {
-			updateMapLayers();
+			createScatterLayer();
 			hasInitialized = true;
+		}
+	});
+
+	$effect(() => {
+		// Only run after initial creation and when columns change
+		if (!hasInitialized) {
+			return;
+		}
+
+		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+
+		if (
+			currentLayer &&
+			(currentLayer.props.latColumn !== latitudeColumn ||
+				currentLayer.props.lngColumn !== longitudeColumn)
+		) {
+			console.log('Latitude or longitude columns changed, recreating layer');
+			createScatterLayer();
+		}
+	});
+
+	let prevSizeColumn = $state<string | null>(null);
+	let prevColorColumn = $state<string | null>(null);
+	let prevLabelColumn = $state<string | null>(null);
+	let prevPointRadius = $state<number>(10);
+	let prevMinPointRadius = $state<number>(1);
+	let prevMaxPointRadius = $state<number>(100);
+	let prevOpacity = $state<number>(0.8);
+	let prevColorScale = $state<string>('viridis');
+	let prevShowLabels = $state<boolean>(false);
+
+	// Update props when optional parameters change
+	$effect(() => {
+		// Only run after initial layer creation
+		if (!hasInitialized || !requiredColumnsSelected) {
+			return;
+		}
+
+		// Detect which properties have changed
+		const changedProps: Record<string, any> = {};
+
+		if (sizeColumn !== prevSizeColumn) {
+			changedProps.sizeColumn = sizeColumn;
+			prevSizeColumn = sizeColumn;
+		}
+
+		if (colorColumn !== prevColorColumn) {
+			changedProps.colorColumn = colorColumn;
+			prevColorColumn = colorColumn;
+		}
+
+		if (labelColumn !== prevLabelColumn) {
+			changedProps.labelColumn = labelColumn;
+			prevLabelColumn = labelColumn;
+		}
+
+		if (pointRadius !== prevPointRadius) {
+			changedProps.pointRadius = pointRadius;
+			prevPointRadius = pointRadius;
+		}
+
+		if (minPointRadius !== prevMinPointRadius) {
+			changedProps.minPointRadius = minPointRadius;
+			prevMinPointRadius = minPointRadius;
+		}
+
+		if (maxPointRadius !== prevMaxPointRadius) {
+			changedProps.maxPointRadius = maxPointRadius;
+			prevMaxPointRadius = maxPointRadius;
+		}
+
+		if (opacity !== prevOpacity) {
+			changedProps.opacity = opacity;
+			prevOpacity = opacity;
+		}
+
+		if (colorScale !== prevColorScale) {
+			changedProps.colorScale = colorScale;
+			prevColorScale = colorScale;
+		}
+
+		if (showLabels !== prevShowLabels) {
+			changedProps.showLabels = showLabels;
+			prevShowLabels = showLabels;
+		}
+
+		// Only update if something changed
+		if (Object.keys(changedProps).length > 0) {
+			updateOptionalProps(changedProps);
 		}
 	});
 
@@ -168,15 +254,11 @@
 						const max = Math.max(...colorValues);
 						colorRange = [min, max];
 					}
-
-					dataLoaded = true;
 				}
 
-				// Yield the complete accumulated array (important for deck.gl)
 				yield allPoints;
 			}
 
-			// Final yield if we didn't yield any points yet
 			if (allPoints.length === 0) {
 				yield [];
 			}
@@ -198,125 +280,154 @@
 		label: string | null;
 	}
 
-	function updateMapLayers() {
-		console.log('==================== UPDATE SCATTER LAYER ====================');
-		console.log('Scatter layer columns selected:', {
-			lat: latitudeColumn,
-			lng: longitudeColumn,
-			size: sizeColumn,
-			color: colorColumn,
-			label: labelColumn
-		});
-		console.log('Scatter layer style settings:', {
-			pointRadius,
-			minPointRadius,
-			maxPointRadius,
-			opacity,
-			colorScale,
-			showLabels
-		});
-
+	// Create a scatter layer when required columns are selected
+	function createScatterLayer() {
 		try {
-			// Remove the existing scatter layer
-			console.log(`Removing scatter layer with ID: ${layer.id}`);
-			layers.remove(layer.id);
+			// Define the initial layer properties
+			const layerProps = {
+				data: loadData(),
+				getPosition: (d: Point) => {
+					if (!d || !d.position || d.position.length !== 2) {
+						console.warn('Invalid scatter position:', d);
+						return [0, 0]; // Default to prevent errors
+					}
+					return d.position;
+				},
+				getRadius: (d: Point) => getPointRadius(d),
+				getFillColor: (d: Point) => getPointColor(d),
+				getLineColor: [0, 0, 0],
+				lineWidthMinPixels: 1,
+				pickable: true,
+				autoHighlight: true,
+				stroked: true,
+				filled: true,
+				radiusScale: 1,
+				radiusMinPixels: 1,
+				radiusMaxPixels: 100,
+				opacity: opacity,
+				updateTriggers: {
+					getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
+					getFillColor: [colorColumn, colorScale, colorRange, opacity]
+				},
+				// Store the column selections as props to detect changes later
+				latColumn: latitudeColumn,
+				lngColumn: longitudeColumn,
+				sizeColumn: sizeColumn,
+				colorColumn: colorColumn,
+				labelColumn: labelColumn
+			};
 
-			// Create a new scatter layer with updated properties
-			console.log(`Creating new scatter layer with ID: ${layer.id}`);
+			// First check if a layer with this ID already exists (cleanup)
+			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (existingLayer) {
+				console.log(`Removing existing layer with ID: ${layer.id}`);
+				layers.remove(layer.id);
+			}
+
+			// Create a new scatter layer with the properties
+
 			const newScatterLayer = LayerFactory.create('scatter', {
 				id: layer.id,
-				props: {
-					data: loadData(),
-					getPosition: (d: Point) => {
-						if (!d || !d.position || d.position.length !== 2) {
-							console.warn('Invalid scatter position:', d);
-							return [0, 0]; // Default to prevent errors
-						}
-						return d.position;
-					},
-					getRadius: (d: Point) => {
-						const radius = getPointRadius(d);
-						// Periodically log radius calculations
-						if (Math.random() < 0.001) {
-							// log 0.1% of points
-							console.log(`Radius calculation for point:`, {
-								size: d.size,
-								calculatedRadius: radius,
-								sizeRange
-							});
-						}
-						return 400;
-					},
-					getFillColor: (d: Point) => {
-						const color = getPointColor(d);
-						// Periodically log color calculations
-						if (Math.random() < 0.001) {
-							// log 0.1% of points
-							console.log(`Color calculation for point:`, {
-								colorValue: d.color,
-								calculatedColor: color,
-								colorRange,
-								colorScale
-							});
-						}
-						return color;
-					},
-					getLineColor: [0, 0, 0],
-					lineWidthMinPixels: 1,
-					pickable: true,
-					autoHighlight: true,
-					stroked: true,
-					filled: true,
-					radiusScale: 1,
-					radiusMinPixels: 1,
-					radiusMaxPixels: 100,
-					opacity: opacity,
-					updateTriggers: {
-						getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
-						getFillColor: [colorColumn, colorScale, colorRange, opacity]
-					}
-				}
+				props: layerProps
 			});
 
-			// Add the new scatter layer to the map
-			console.log(`Adding new scatter layer with ID: ${layer.id}`);
+			// Add the new scatter layer
 			layers.add(newScatterLayer);
-
-			console.log(`Scatter layer updated successfully`);
-
-			// Create and add a new label layer if labels are enabled
-
-			// Update the current label layer ID
-
-			console.log('==================== SCATTER LAYER UPDATE COMPLETE ====================');
+			console.log('==================== SCATTER LAYER CREATED ====================');
 		} catch (error) {
 			//@ts-expect-error
-			console.error('Error updating scatter layer:', error, error.stack);
+			console.error('Error creating scatter layer:', error, error.stack);
 		}
 	}
 
-	// Dynamic point radius calculation
+	// Update layer props when optional parameters change
+	function updateOptionalProps(changedProps: Record<string, any>) {
+		try {
+			// Find the current layer
+			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				return;
+			}
+
+			// Base update object with updateTriggers
+			const updateObj: Record<string, any> = { updateTriggers: {} };
+
+			// Handle radius/size changes
+			if (
+				'pointRadius' in changedProps ||
+				'minPointRadius' in changedProps ||
+				'maxPointRadius' in changedProps ||
+				'sizeColumn' in changedProps
+			) {
+				updateObj.getRadius = (d: Point) => getPointRadius(d);
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange]
+				};
+			}
+
+			// Handle color changes
+			if (
+				'colorColumn' in changedProps ||
+				'colorScale' in changedProps ||
+				'opacity' in changedProps
+			) {
+				updateObj.getFillColor = (d: Point) => getPointColor(d);
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getFillColor: [colorColumn, colorScale, colorRange, opacity]
+				};
+			}
+
+			// Direct opacity setting
+			if ('opacity' in changedProps) {
+				updateObj.opacity = opacity;
+			}
+
+			// Update column references
+			if ('sizeColumn' in changedProps) {
+				updateObj.sizeColumn = sizeColumn;
+			}
+
+			if ('colorColumn' in changedProps) {
+				updateObj.colorColumn = colorColumn;
+			}
+
+			if ('labelColumn' in changedProps) {
+				updateObj.labelColumn = labelColumn;
+			}
+
+			if (
+				'sizeColumn' in changedProps ||
+				'colorColumn' in changedProps ||
+				'labelColumn' in changedProps
+			) {
+				updateObj.data = loadData();
+			}
+
+			layers.updateProps(layer.id, updateObj);
+		} catch (error) {
+			//@ts-expect-error
+			console.error('Error updating scatter layer props:', error, error.stack);
+		}
+	} // Modify your updateMapLayers to use the new functions
+
 	function getPointRadius(point: any) {
-		if (!sizeColumn || point.size === null) {
+		if (!sizeColumn || point.size === null || point.size === undefined) {
 			return pointRadius;
 		}
 
-		// Calculate normalized radius based on the data range
 		const sizeMin = sizeRange[0];
 		const sizeMax = sizeRange[1];
 
-		// Handle edge case where min and max are the same
 		if (sizeMin === sizeMax) {
-			return pointRadius;
+			return pointRadius; // Use base radius for uniform data
 		}
 
-		// Normalize the size value to 0-1 range
 		const normalizedSize = (point.size - sizeMin) / (sizeMax - sizeMin);
-
-		// Map the normalized value to the radius range
 		return minPointRadius + normalizedSize * (maxPointRadius - minPointRadius);
 	}
-
 	// Dynamic color calculation
 	function getPointColor(point: any) {
 		if (!colorColumn || point.color === null) {
@@ -369,11 +480,8 @@
 					}
 				}
 
-				// Main query with all data
-				console.log(`Executing stream query: SELECT ${columnsStr} FROM ${filename}`);
 				const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${filename}`);
 
-				// Transform the rows and yield the results
 				yield* transformRows(stream.readRows());
 			} else {
 				console.log('No dataset chosen');

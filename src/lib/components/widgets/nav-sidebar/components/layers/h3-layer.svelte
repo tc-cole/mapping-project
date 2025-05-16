@@ -5,25 +5,38 @@
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
+	import { cellToLatLng } from 'h3-js';
 
 	const CHUNK_SIZE = 100000;
 
+	// Required columns
 	let h3Column = $state<string | undefined>();
 	let valueColumn = $state<string | undefined>();
+
 	let colorScale = $state<string>('viridis');
 	let opacity = $state<number>(0.8);
 	let elevationScale = $state<number>(10);
 	let extruded = $state<boolean>(false);
 	let wireframe = $state<boolean>(true);
 	let coverage = $state<number>(1.0);
+	let scaleType = $state<string>('linear');
+
+	let prevColorScale = $state<string>('viridis');
+	let prevOpacity = $state<number>(0.8);
+	let prevElevationScale = $state<number>(10);
+	let prevExtruded = $state<boolean>(false);
+	let prevWireframe = $state<boolean>(true);
+	let prevCoverage = $state<number>(1.0);
+	let prevScaleType = $state<string>('linear');
+
+	// State variables
 	let hasInitialized = $state(false);
 	let dataLoaded = $state(false);
 	let valueRange = $state<[number, number]>([0, 1]);
-	let currentLayerId = $state<string | null>(null); // Track the current layer ID
 
 	let { layer } = $props();
 
-	// Available color scales (matching the scatter plot for consistency)
+	// Available color scales (matching other layers for consistency)
 	const colorScales = [
 		'viridis',
 		'plasma',
@@ -39,36 +52,87 @@
 
 	// Scale types
 	const scaleTypes = ['linear', 'log'];
-	let scaleType = $state<string>('linear');
 
-	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(h3Column !== undefined && valueColumn !== undefined);
 
-	// Effect to update map when configuration changes
 	$effect(() => {
-		console.log('Effect checking required columns for H3 Layer:', {
-			h3Column,
-			valueColumn
-		});
-
 		if (requiredColumnsSelected && !hasInitialized) {
-			console.log('Initializing H3 layer - all required columns selected');
-			updateMapLayers();
+			createH3Layer();
 			hasInitialized = true;
 		}
 	});
 
-	// Update effect whenever key parameters change
 	$effect(() => {
-		if (hasInitialized) {
-			console.log('Updating H3 layer due to parameter change');
-			updateMapLayers();
+		if (!hasInitialized) {
+			return;
+		}
+
+		// Find the current layer
+		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+
+		// Recreate layer if main columns have changed
+		if (
+			currentLayer &&
+			(currentLayer.props.h3Column !== h3Column || currentLayer.props.valueColumn !== valueColumn)
+		) {
+			console.log('H3 or value column changed, recreating layer');
+			createH3Layer();
 		}
 	});
 
-	// Enhanced H3 data transformer with comprehensive debugging
+	// Update props when optional parameters change
+	$effect(() => {
+		// Only run after initial layer creation
+		if (!hasInitialized || !requiredColumnsSelected) {
+			return;
+		}
+
+		// Detect which properties have changed
+		const changedProps: Record<string, any> = {};
+
+		if (colorScale !== prevColorScale) {
+			changedProps.colorScale = colorScale;
+			prevColorScale = colorScale;
+		}
+
+		if (opacity !== prevOpacity) {
+			changedProps.opacity = opacity;
+			prevOpacity = opacity;
+		}
+
+		if (elevationScale !== prevElevationScale) {
+			changedProps.elevationScale = elevationScale;
+			prevElevationScale = elevationScale;
+		}
+
+		if (extruded !== prevExtruded) {
+			changedProps.extruded = extruded;
+			prevExtruded = extruded;
+		}
+
+		if (wireframe !== prevWireframe) {
+			changedProps.wireframe = wireframe;
+			prevWireframe = wireframe;
+		}
+
+		if (coverage !== prevCoverage) {
+			changedProps.coverage = coverage;
+			prevCoverage = coverage;
+		}
+
+		if (scaleType !== prevScaleType) {
+			changedProps.scaleType = scaleType;
+			prevScaleType = scaleType;
+		}
+
+		// Only update if something changed
+		if (Object.keys(changedProps).length > 0) {
+			updateOptionalProps(changedProps);
+		}
+	});
+
+	// H3 data transformer function
 	async function* transformRows(rows: AsyncIterable<any[]>) {
-		console.log('==================== H3 TRANSFORM START ====================');
 		console.log('Starting H3 transformRows with columns:', {
 			h3: h3Column,
 			value: valueColumn
@@ -86,23 +150,12 @@
 		let nullValueCount = 0;
 
 		try {
-			// First yield an empty array to initialize
-			console.log('Yielding initial empty array');
 			yield [];
 
-			// Process batches from DuckDB
 			for await (const batch of rows) {
 				batchCount++;
-				console.log(`\n----- H3 BATCH ${batchCount} -----`);
-				console.log(`Received batch with ${batch.length} rows`);
+				console.log(`Processing H3 batch ${batchCount} with ${batch.length} rows`);
 				totalRowsProcessed += batch.length;
-
-				// Log the first row of each batch to see the raw format
-				if (batch.length > 0) {
-					console.log('First row in batch (raw):', batch[0]);
-				} else {
-					console.log('Batch is empty');
-				}
 
 				// Process each row in the batch
 				const validHexagons = [];
@@ -110,7 +163,6 @@
 				for (const row of batch) {
 					// Skip rows with missing data
 					if (!row) {
-						console.log('Skipping undefined/null row');
 						continue;
 					}
 
@@ -118,9 +170,6 @@
 					//@ts-expect-error
 					if (row[h3Column] === null || row[h3Column] === undefined) {
 						nullH3Count++;
-						if (nullH3Count <= 5) {
-							console.log('Skipping row with null/undefined H3 index:', row);
-						}
 						continue;
 					}
 
@@ -135,15 +184,8 @@
 						//@ts-expect-error
 						if (row[valueColumn] === null || row[valueColumn] === undefined) {
 							nullValueCount++;
-							if (nullValueCount <= 5) {
-								console.log('Skipping row with null/undefined value:', row);
-							}
 						} else {
 							invalidValueCount++;
-							if (invalidValueCount <= 5) {
-								//@ts-expect-error
-								console.log(`Skipping row with NaN value: ${row[valueColumn]}`, row);
-							}
 						}
 						continue;
 					}
@@ -156,15 +198,24 @@
 
 					if (!isValidH3) {
 						invalidH3Count++;
-						if (invalidH3Count <= 5) {
-							console.log(`Skipping row with invalid H3 index format: ${h3Index}`, row);
-						}
 						continue;
 					}
 
 					// Convert value to number
 					//@ts-expect-error
 					const value = Number(row[valueColumn]);
+
+					// Try to convert H3 index to lat/lng using h3-js
+					let lat = null;
+					let lng = null;
+					try {
+						// Only used for validation - we don't need to store these
+						const [lat, lng] = cellToLatLng(h3Index);
+					} catch (error) {
+						// If h3-js can't process this, it's an invalid H3 index
+						invalidH3Count++;
+						continue;
+					}
 
 					// Create hexagon object
 					const hexagon = {
@@ -176,17 +227,7 @@
 					values.push(value);
 					validHexagons.push(hexagon);
 					validHexagonCount++;
-
-					// Occasionally log sample hexagons
-					if (validHexagonCount <= 5 || validHexagonCount % 10000 === 0) {
-						console.log(`Processed hexagon: H3=${h3Index}, value=${value}`);
-					}
 				}
-
-				// Log batch summary
-				console.log(
-					`Batch ${batchCount} results: ${validHexagons.length} valid hexagons from ${batch.length} rows`
-				);
 
 				// Add batch hexagons to accumulated collection
 				allHexagons = [...allHexagons, ...validHexagons];
@@ -197,47 +238,10 @@
 					const max = Math.max(...values);
 					valueRange = [min, max];
 					console.log('Value range calculated:', valueRange);
-
-					// Basic statistics
-					const sum = values.reduce((acc, val) => acc + val, 0);
-					const avg = sum / values.length;
-					const sortedValues = [...values].sort((a, b) => a - b);
-					const median = sortedValues[Math.floor(sortedValues.length / 2)];
-
-					console.log('Value statistics:', {
-						min,
-						max,
-						avg,
-						median,
-						count: values.length
-					});
-
 					dataLoaded = true;
 				}
 
-				// Log the total hexagons processed so far
-				console.log(
-					`TOTAL: ${allHexagons.length} valid hexagons so far after ${batchCount} batches`
-				);
-
-				// Show a sample of hexagons
-				if (allHexagons.length > 0) {
-					console.log('Sample of accumulated hexagons:');
-					console.log(' - First hexagon:', allHexagons[0]);
-					if (allHexagons.length > 1) {
-						const middleIndex = Math.floor(allHexagons.length / 2);
-						console.log(` - Middle hexagon (${middleIndex}):`, allHexagons[middleIndex]);
-					}
-					if (allHexagons.length > 2) {
-						console.log(
-							` - Last hexagon (${allHexagons.length - 1}):`,
-							allHexagons[allHexagons.length - 1]
-						);
-					}
-				}
-
 				// Yield the accumulated hexagons
-				console.log(`Yielding array with ${allHexagons.length} total hexagons`);
 				yield allHexagons;
 
 				// If we've reached the chunk size, start a new collection
@@ -253,51 +257,31 @@
 				yield [];
 			}
 
-			// Log final statistics
-			console.log('\n========== H3 TRANSFORM SUMMARY ==========');
-			console.log(`Total batches processed: ${batchCount}`);
-			console.log(`Total rows processed: ${totalRowsProcessed}`);
-			console.log(`Valid hexagons: ${validHexagonCount}`);
-			console.log(`Invalid data counts:`);
-			console.log(` - Null/undefined H3 indices: ${nullH3Count}`);
-			console.log(` - Invalid H3 format: ${invalidH3Count}`);
-			console.log(` - Null/undefined values: ${nullValueCount}`);
-			console.log(` - Invalid (NaN) values: ${invalidValueCount}`);
-			console.log(`Value range: [${valueRange[0]}, ${valueRange[1]}]`);
-			console.log('==================== H3 TRANSFORM END ====================');
+			console.log(`H3 transform complete: ${validHexagonCount} hexagons processed`);
 		} catch (error) {
-			console.error('ERROR in H3 transformRows:', error); //@ts-expect-error
-			console.error('Error stack:', error.stack);
+			console.error('ERROR in H3 transformRows:', error);
 
 			// In case of error, yield what we have so far
 			if (allHexagons.length > 0) {
-				console.log(`Error occurred, but yielding ${allHexagons.length} hexagons collected so far`);
 				yield allHexagons;
 			} else {
-				console.log('Error occurred and no hexagons collected, yielding empty array');
 				yield [];
 			}
 		}
 	}
 
-	// Enhanced loadData function with better error handling and logging
+	// Load data with async generator
 	async function* loadData() {
 		try {
-			console.log('==================== H3 LOAD DATA START ====================');
 			// Initial empty dataset
-			console.log('Yielding initial empty array from loadData');
 			yield [];
 
 			// Get database instance
-			console.log('Getting database instance for H3 layer');
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
-			console.log('Database client initialized for H3 layer');
 
 			if ($chosenDataset !== null) {
-				console.log('Processing dataset for H3 layer:', $chosenDataset);
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
-				console.log('Cleaned filename:', filename);
 
 				// Main query with H3 and value columns
 				const query = `SELECT ${h3Column}, ${valueColumn} FROM ${filename}`;
@@ -305,164 +289,154 @@
 
 				try {
 					const stream = await client.queryStream(query);
-					console.log('H3 layer stream query executed successfully');
-					console.log('H3 layer stream schema:', stream.schema);
-
-					// Log the schema details
-					if (stream.schema) {
-						console.log('Column details from schema for H3 layer:');
-						stream.schema.forEach((field) => {
-							console.log(
-								` - ${field.name}: ${field.type} (${field.databaseType}) ${field.nullable ? 'nullable' : 'not nullable'}`
-							);
-						});
-					}
 
 					// Transform the rows and yield the results
-					console.log('Starting H3 data transformation...');
 					const readRowsGenerator = stream.readRows();
 					yield* transformRows(readRowsGenerator);
 				} catch (streamError) {
-					console.error('Error in H3 layer stream query:', streamError); //@ts-expect-error
-					console.error('Stream error stack:', streamError.stack);
+					console.error('Error in H3 layer stream query:', streamError);
 					yield [];
 				}
 			} else {
 				console.log('No dataset chosen for H3 layer');
 				yield [];
 			}
-			console.log('==================== H3 LOAD DATA END ====================');
 		} catch (error) {
-			console.error('Error in H3 loadData:', error); //@ts-expect-error
-			console.error('Error stack:', error.stack);
+			console.error('Error in H3 loadData:', error);
 			// Return empty array in case of error
 			yield [];
 		}
 	}
 
-	// Updated update map layers function to use the add/remove pattern
-	function updateMapLayers() {
-		console.log('==================== UPDATE H3 LAYER ====================');
-		console.log('H3 layer columns selected:', {
-			h3: h3Column,
-			value: valueColumn
-		});
-		console.log('H3 layer style settings:', {
-			colorScale,
-			scaleType,
-			opacity,
-			coverage,
-			extruded,
-			elevationScale,
-			wireframe,
-			valueRange
-		});
-
+	// Create initial H3 layer
+	function createH3Layer() {
 		try {
-			// Remove existing layer if it exists
-			if (currentLayerId) {
-				console.log(`Removing previous H3 layer with ID: ${currentLayerId}`);
-				layers.remove(currentLayerId);
-				currentLayerId = null;
-			} else {
-				console.log(`Initial layer creation, no previous layer to remove`);
+			console.log('Creating new H3 layer');
+
+			// Define the initial layer properties
+			const layerProps = {
+				data: loadData(),
+				getHexagon: (d: any) => {
+					if (!d || !d.hex) {
+						console.warn('Invalid hexagon data:', d);
+						return '0'; // Return a default H3 index
+					}
+					return d.hex;
+				},
+				getFillColor: (d: any) => {
+					// This will be handled by the layer's color mapping based on getColorValue
+					return [255, 140, 0, Math.floor(opacity * 255)];
+				},
+				getElevation: (d: any) => {
+					if (!extruded) return 0;
+					return d.value || 0;
+				},
+				getColorValue: (d: any) => {
+					return d.value;
+				},
+				elevationScale: elevationScale,
+				extruded: extruded,
+				wireframe: wireframe,
+				coverage: coverage,
+				colorScale: colorScale,
+				colorScaleType: scaleType,
+				colorDomain: valueRange,
+				opacity: opacity,
+				pickable: true,
+				autoHighlight: true,
+				filled: true,
+				updateTriggers: {
+					getElevation: [elevationScale, extruded, valueRange],
+					getColorValue: [valueColumn, valueRange],
+					getFillColor: [colorScale, opacity]
+				},
+				// Store the column selections as props to detect changes later
+				h3Column: h3Column,
+				valueColumn: valueColumn
+			};
+
+			// First check if a layer with this ID already exists (cleanup)
+			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (existingLayer) {
+				console.log(`Removing existing layer with ID: ${layer.id}`);
+				layers.remove(layer.id);
 			}
 
-			// Create a new H3 layer using LayerFactory
-			console.log(`Creating new H3 layer`);
-
+			// Create a new H3 layer
 			const newLayer = LayerFactory.create('h3', {
-				props: {
-					data: loadData(),
-					getHexagon: (d: any) => {
-						// Validate hexagon
-						if (!d || !d.hex) {
-							console.warn('Invalid hexagon data:', d);
-							return '0'; // Return a default H3 index
-						}
-						// Occasionally log hexagon indices
-						if (Math.random() < 0.001) {
-							// Log ~0.1% of hexagons
-							console.log(`H3 index: ${d.hex}`);
-						}
-						return d.hex;
-					},
-					getFillColor: (d: any) => {
-						// This will be handled by the layer's color mapping based on getColorValue
-						return [255, 140, 0, Math.floor(opacity * 255)];
-					},
-					getElevation: (d: any) => {
-						if (!extruded) return 0;
-
-						const value = d.value || 0;
-						// Occasionally log elevation values
-						if (Math.random() < 0.001) {
-							// Log ~0.1% of hexagons
-							console.log(`H3 elevation value: ${value}, scaled: ${value * elevationScale}`);
-						}
-						return value;
-					},
-					getColorValue: (d: any) => {
-						const value = d.value;
-						// Occasionally log color values
-						if (Math.random() < 0.001) {
-							// Log ~0.1% of hexagons
-							console.log(`H3 color value: ${value}, range: [${valueRange[0]}, ${valueRange[1]}]`);
-						}
-						return value;
-					},
-					elevationScale: elevationScale,
-					extruded: extruded,
-					wireframe: wireframe,
-					coverage: coverage,
-					colorScale: colorScale,
-					colorScaleType: scaleType,
-					colorDomain: valueRange,
-					opacity: opacity,
-					pickable: true,
-					autoHighlight: true,
-					filled: true,
-					updateTriggers: {
-						getElevation: [elevationScale, extruded, valueRange],
-						getColorValue: [valueColumn, valueRange],
-						getFillColor: [colorScale, opacity]
-					},
-					// Add callbacks for visibility debugging
-					onDataLoad: (info: any) => {
-						console.log('H3 layer data loaded:', {
-							hexagonCount: Array.isArray(info?.data) ? info.data.length : 0,
-							sampleHexagon: Array.isArray(info?.data) && info.data.length > 0 ? info.data[0] : null
-						});
-					},
-					onHover: (info: any) => {
-						if (info && info.object) {
-							// Don't log every hover to avoid console spam
-							if (Math.random() < 0.1) {
-								// Only log ~10% of hovers
-								console.log('H3 hover info:', {
-									hex: info.object.hex,
-									value: info.object.value,
-									x: info.x,
-									y: info.y
-								});
-							}
-						}
-					}
-				}
+				id: layer.id,
+				props: layerProps
 			});
 
-			// Store the new layer ID for future updates
-			currentLayerId = newLayer.id;
-
-			// Add the new layer to the map
-			console.log(`Adding new H3 layer with ID: ${newLayer.id}`);
+			// Add the new layer
 			layers.add(newLayer);
-
-			console.log(`H3 layer updated successfully using add/remove pattern`);
-			console.log('==================== H3 UPDATE COMPLETE ====================');
+			console.log('H3 layer created successfully');
 		} catch (error) {
-			console.error('Error updating H3 layer:', error); //@ts-expect-error
-			console.error('Error stack:', error.stack);
+			console.error('Error creating H3 layer:', error);
+		}
+	}
+
+	// Update layer props when optional parameters change
+	function updateOptionalProps(changedProps: Record<string, any>) {
+		try {
+			// Find the current layer
+			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				return;
+			}
+
+			// Base update object with updateTriggers
+			const updateObj: Record<string, any> = { updateTriggers: {} };
+
+			// Handle color scale changes
+			if ('colorScale' in changedProps) {
+				updateObj.colorScale = colorScale;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getFillColor: [colorScale, opacity]
+				};
+			}
+
+			// Handle opacity changes
+			if ('opacity' in changedProps) {
+				updateObj.opacity = opacity;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getFillColor: [colorScale, opacity]
+				};
+			}
+
+			// Handle elevation changes
+			if ('elevationScale' in changedProps || 'extruded' in changedProps) {
+				updateObj.elevationScale = elevationScale;
+				updateObj.extruded = extruded;
+				updateObj.updateTriggers = {
+					...updateObj.updateTriggers,
+					getElevation: [elevationScale, extruded, valueRange]
+				};
+			}
+
+			// Handle wireframe changes
+			if ('wireframe' in changedProps) {
+				updateObj.wireframe = wireframe;
+			}
+
+			// Handle coverage changes
+			if ('coverage' in changedProps) {
+				updateObj.coverage = coverage;
+			}
+
+			// Handle scale type changes
+			if ('scaleType' in changedProps) {
+				updateObj.colorScaleType = scaleType;
+			}
+
+			// Apply the updates
+			console.log('Updating H3 layer properties:', Object.keys(changedProps).join(', '));
+			layers.updateProps(layer.id, updateObj);
+		} catch (error) {
+			console.error('Error updating H3 layer props:', error);
 		}
 	}
 </script>
