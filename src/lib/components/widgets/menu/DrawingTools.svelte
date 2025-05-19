@@ -1,69 +1,168 @@
+<script lang="ts" module>
+	import { writable } from 'svelte/store';
+
+	export const openDrawer = writable<boolean>(false);
+</script>
+
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
 
-	let { map, draw, onFeaturesUpdate } = $props();
+	// Define props with correct typing
+	let { map, draw, onFeaturesUpdate } = $props<{
+		map: mapboxgl.Map | undefined;
+		draw: MapboxDraw | undefined;
+		onFeaturesUpdate: Function;
+	}>();
 
-	// State variables
 	let drawnFeatures = $state<any[]>([]);
-	let activeDrawMode = $state('simple_select');
+	let activeEditTool = $state('simple_select');
+	let isDrawing = $state(false);
+	let lastCompletedFeature = $state<any>(null);
 
 	$effect(() => {
 		if (map && draw) {
+			// Set up event handlers for draw actions
 			map.on('draw.create', handleDrawCreate);
 			map.on('draw.update', handleDrawUpdate);
 			map.on('draw.delete', handleDrawDelete);
 			map.on('draw.modechange', handleModeChange);
+			map.on('draw.selectionchange', handleSelectionChange);
+
+			// These events track the drawing state
+			map.on('draw.render', handleDrawRender);
+			map.on('mouseup', handleMouseUp);
+			map.on('touchend', handleTouchEnd);
 
 			return () => {
+				console.log('Cleaning up map event handlers');
 				map.off('draw.create', handleDrawCreate);
 				map.off('draw.update', handleDrawUpdate);
 				map.off('draw.delete', handleDrawDelete);
 				map.off('draw.modechange', handleModeChange);
+				map.off('draw.selectionchange', handleSelectionChange);
+				map.off('draw.render', handleDrawRender);
+				map.off('mouseup', handleMouseUp);
+				map.off('touchend', handleTouchEnd);
 			};
 		}
 	});
 
 	// Handle creating new features
 	function handleDrawCreate(e: any) {
+		console.log('Feature created:', e.features);
 		drawnFeatures = [...drawnFeatures, ...e.features];
-		onFeaturesUpdate(drawnFeatures);
+		lastCompletedFeature = e.features[0];
+
+		// The drawing is complete when a feature is created
+		isDrawing = false;
+
+		// You can trigger any action you want when drawing is complete
+		onDrawingComplete(e.features[0]);
 	}
 
-	// Handle updating existing features
 	function handleDrawUpdate(e: any) {
-		// Update our features array
+		console.log('Feature updated:', e.features);
 		const updatedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = [...drawnFeatures.filter((f) => !updatedIds.includes(f.id)), ...e.features];
-		onFeaturesUpdate(drawnFeatures);
+		lastCompletedFeature = e.features[0];
+
+		// The editing is complete when a feature is updated
+		isDrawing = false;
 	}
 
-	// Handle deleting features
 	function handleDrawDelete(e: any) {
-		// Remove deleted features from our array
+		console.log('Feature deleted:', e.features);
 		const deletedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = drawnFeatures.filter((f) => !deletedIds.includes(f.id));
-		onFeaturesUpdate(drawnFeatures);
+		lastCompletedFeature = null;
 	}
 
-	// Handle mode changes
 	function handleModeChange(e: any) {
-		activeDrawMode = e.mode;
+		console.log('Mode changed:', e.mode);
+		activeEditTool = e.mode;
+
+		isDrawing = e.mode.startsWith('draw_');
+
+		if (e.mode === 'simple_select') {
+			isDrawing = false;
+		}
 	}
 
-	// Helper function to directly activate a drawing mode
-	function setDrawMode(mode: any) {
+	function handleSelectionChange(e: any) {
+		console.log('Selection changed:', e.features);
+	}
+
+	// This event fires continuously during drawing
+	function handleDrawRender(e: any) {
+		if (activeEditTool.startsWith('draw_') && !activeEditTool.includes('select')) {
+			isDrawing = true;
+		}
+	}
+
+	function handleMouseUp(e: any) {
+		if (isDrawing) {
+			const currentFeatures = draw?.getAll().features || [];
+			const inProgressFeature = currentFeatures.find(
+				(f: any) => f.id === draw?.getSelectedIds()[0]
+			);
+
+			if (inProgressFeature) {
+				if (activeEditTool === 'draw_point') {
+					isDrawing = false;
+					lastCompletedFeature = inProgressFeature;
+					onDrawingComplete(inProgressFeature);
+				}
+			}
+		}
+	}
+
+	function handleTouchEnd(e: any) {
+		handleMouseUp(e);
+	}
+
+	// Function that runs whenever a drawing is completed
+	function onDrawingComplete(feature: any) {
+		console.log('Drawing completed!', feature);
+		// You can perform any actions here, such as:
+		// - Saving to a database
+		// - Adding to a DeckGL layer
+		// - Showing details in the UI
+		// - etc.
+
+		openDrawer.set(true);
+	}
+
+	function setDrawMode(mode: string) {
 		if (draw) {
-			draw.changeMode(mode);
-			activeDrawMode = mode;
+			try {
+				draw.changeMode(mode);
+				activeEditTool = mode;
+			} catch (error) {
+				console.error('Error changing draw mode:', error);
+			}
+		} else {
+			console.warn('Draw object not initialized yet');
+		}
+	}
+
+	function trashSelected() {
+		if (draw) {
+			try {
+				draw.trash();
+			} catch (error) {
+				console.error('Error deleting features:', error);
+			}
+		} else {
+			console.warn('Draw object not initialized yet');
 		}
 	}
 </script>
 
-<!-- Toolbar for quick access to editing tools -->
+<!-- Toolbar for quick access to editing tools - KEEPING ORIGINAL STYLING -->
 <div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">
 	<!-- Selection/Modify Tool -->
 	<button
-		class={`rounded p-2 ${activeDrawMode === 'simple_select' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
+		class={`rounded p-2 ${activeEditTool === 'simple_select' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
 		title="Select & Modify Features"
 		onclick={() => setDrawMode('simple_select')}
 	>
@@ -73,7 +172,7 @@
 
 	<!-- Draw Point Tool -->
 	<button
-		class={`rounded p-2 ${activeDrawMode === 'draw_point' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
+		class={`rounded p-2 ${activeEditTool === 'draw_point' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
 		title="Draw Point"
 		onclick={() => setDrawMode('draw_point')}
 	>
@@ -83,7 +182,7 @@
 
 	<!-- Draw Line Tool -->
 	<button
-		class={`rounded p-2 ${activeDrawMode === 'draw_line_string' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
+		class={`rounded p-2 ${activeEditTool === 'draw_line_string' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
 		title="Draw Line"
 		onclick={() => setDrawMode('draw_line_string')}
 	>
@@ -93,7 +192,7 @@
 
 	<!-- Draw Polygon Tool -->
 	<button
-		class={`rounded p-2 ${activeDrawMode === 'draw_polygon' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
+		class={`rounded p-2 ${activeEditTool === 'draw_polygon' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
 		title="Draw Polygon"
 		onclick={() => setDrawMode('draw_polygon')}
 	>
@@ -106,7 +205,7 @@
 	<button
 		class="rounded p-2 hover:bg-gray-700"
 		title="Delete Selected Features"
-		onclick={() => draw.trash()}
+		onclick={trashSelected}
 	>
 		<Trash2 size={20} />
 		<span class="sr-only">Delete</span>

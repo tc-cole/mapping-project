@@ -57,6 +57,8 @@
 				}
 			});
 
+			map?.addControl(draw);
+
 			if ($editableGeoJSON.length > 0) {
 				draw.add({
 					type: 'FeatureCollection',
