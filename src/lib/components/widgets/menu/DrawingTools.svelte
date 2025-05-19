@@ -87,7 +87,6 @@
 	}
 
 	function handleSelectionChange(e: any) {
-		console.log('Selection changed:', e);
 		openDrawer.set(true);
 		clickedGeoJSON.set(e.features[0]);
 	}
