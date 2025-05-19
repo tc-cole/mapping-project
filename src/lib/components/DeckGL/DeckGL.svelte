@@ -5,6 +5,7 @@
 	import DrawingTools from '$lib/components/widgets/menu/DrawingTools.svelte';
 	import { layers, editableGeoJSON } from '$lib/components/io/stores';
 	import { mapViewState } from '$lib/components/io/layer-management.svelte';
+	import { Deck } from '@deck.gl/core';
 
 	mapboxgl.accessToken =
 		'pk.eyJ1IjoiYXJwZXJ5YW4iLCJhIjoiY2l4cTJkc2t6MDAzcjJxcG9maWp1ZmFjMCJ9.XT957ywrTABjNFqGdp_37g';
@@ -66,12 +67,32 @@
 				});
 			}
 		});
+
+		deckInstance = new Deck({
+			canvas: 'deck-canvas',
+			width: '100%',
+			height: '100%',
+			initialViewState: initialViewState,
+			controller: true,
+			onViewStateChange: ({ viewState }: any) => {
+				mapViewState.set(viewState);
+				map?.jumpTo({
+					center: [viewState.longitude, viewState.latitude],
+					zoom: viewState.zoom,
+					bearing: viewState.bearing,
+					pitch: viewState.pitch
+				});
+			},
+			layers: []
+		});
 	});
 
 	// Function to handle drawn features from child component
 	function handleFeaturesUpdate(features: any) {}
 
 	onDestroy(() => {
+		deckInstance && deckInstance.finalize();
+
 		map && map.remove();
 	});
 </script>

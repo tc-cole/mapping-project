@@ -448,6 +448,11 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
+			await client.query(`
+				INSTALL spatial;
+				LOAD spatial;
+				`);
+
 			if ($chosenDataset !== null) {
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
 
@@ -460,12 +465,10 @@
 				const columnsStr = columns.join(', ');
 
 				// Sample query to get first row for positioning
-				console.log(`Executing query: SELECT ${columnsStr} FROM ${filename} LIMIT 1`);
 				const data = await client.query(`SELECT ${columnsStr} FROM ${filename} LIMIT 1`);
 
 				if (data && data.length > 0) {
 					const viewingPosition = data[0];
-					console.log('Initial viewing position:', viewingPosition);
 
 					// Fly to first point location
 

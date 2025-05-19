@@ -2,6 +2,7 @@
 	import { writable } from 'svelte/store';
 
 	export const openDrawer = writable<boolean>(false);
+	export const clickedGeoJSON = writable();
 </script>
 
 <script lang="ts">
@@ -34,7 +35,6 @@
 			map.on('touchend', handleTouchEnd);
 
 			return () => {
-				console.log('Cleaning up map event handlers');
 				map.off('draw.create', handleDrawCreate);
 				map.off('draw.update', handleDrawUpdate);
 				map.off('draw.delete', handleDrawDelete);
@@ -61,7 +61,6 @@
 	}
 
 	function handleDrawUpdate(e: any) {
-		console.log('Feature updated:', e.features);
 		const updatedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = [...drawnFeatures.filter((f) => !updatedIds.includes(f.id)), ...e.features];
 		lastCompletedFeature = e.features[0];
@@ -71,25 +70,26 @@
 	}
 
 	function handleDrawDelete(e: any) {
-		console.log('Feature deleted:', e.features);
 		const deletedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = drawnFeatures.filter((f) => !deletedIds.includes(f.id));
 		lastCompletedFeature = null;
 	}
 
 	function handleModeChange(e: any) {
-		console.log('Mode changed:', e.mode);
 		activeEditTool = e.mode;
 
 		isDrawing = e.mode.startsWith('draw_');
 
 		if (e.mode === 'simple_select') {
 			isDrawing = false;
+			console.log(e);
 		}
 	}
 
 	function handleSelectionChange(e: any) {
-		console.log('Selection changed:', e.features);
+		console.log('Selection changed:', e);
+		openDrawer.set(true);
+		clickedGeoJSON.set(e.features[0]);
 	}
 
 	// This event fires continuously during drawing
@@ -128,8 +128,6 @@
 		// - Adding to a DeckGL layer
 		// - Showing details in the UI
 		// - etc.
-
-		openDrawer.set(true);
 	}
 
 	function setDrawMode(mode: string) {
