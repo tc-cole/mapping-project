@@ -5,7 +5,6 @@
 	import LineLayer from './layers/line-layer.svelte';
 	import ArcLayer from './layers/arc-layer.svelte';
 	import H3Layer from './layers/h3-layer.svelte';
-	import EditableGeoJsonLayer from './layers/editable-geojson-layer.svelte';
 	import { layerDefs } from '$lib/components/io/layer-management.svelte'; // singleton instance
 
 	let { layertype, layer } = $props();
@@ -25,8 +24,8 @@
 		<!--
 		{:else if layertype === layerDefs.trips.label}
 			<TripsLayer {layer} />
-			-->
-	{:else if layertype === 'GeoJSON'}
-		<EditableGeoJsonLayer {layer} />
+ c	{:else if layertype === 'GeoJSON'}
+		<GeoJSON {layer} /> 
+	-->
 	{/if}
 </div>

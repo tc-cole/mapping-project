@@ -1,16 +1,18 @@
 <script lang="ts">
-	import { mapViewState } from '$lib/components/io/layer-management.svelte';
-	import { layers } from '$lib/components/io/stores';
-
 	import { onDestroy, onMount } from 'svelte';
-	import { Deck } from '@deck.gl/core';
 	import mapboxgl from 'mapbox-gl';
+	import MapboxDraw from '@mapbox/mapbox-gl-draw';
+	import DrawingTools from '$lib/components/widgets/menu/DrawingTools.svelte';
+	import { layers, editableGeoJSON } from '$lib/components/io/stores';
+	import { mapViewState } from '$lib/components/io/layer-management.svelte';
 
 	mapboxgl.accessToken =
 		'pk.eyJ1IjoiYXJwZXJ5YW4iLCJhIjoiY2l4cTJkc2t6MDAzcjJxcG9maWp1ZmFjMCJ9.XT957ywrTABjNFqGdp_37g';
-	let deckInstance: any;
-	let map: mapboxgl.Map;
+
+	let map: mapboxgl.Map | undefined = $state();
 	let container: HTMLElement;
+	let draw: MapboxDraw | undefined = $state();
+	let mapLoaded = $state(false);
 
 	const initialViewState = {
 		longitude: -74,
@@ -20,6 +22,7 @@
 		pitch: 0,
 		bearing: 0
 	};
+	let deckInstance: any;
 
 	$effect(() => {
 		const updatedLayers = $layers
@@ -33,37 +36,50 @@
 		map = new mapboxgl.Map({
 			container: container,
 			style: 'mapbox://styles/mapbox/navigation-night-v1',
-			...initialViewState,
-			interactive: true // Disable map interactions - Deck.gl will handle them
+			center: [initialViewState.longitude, initialViewState.latitude],
+			zoom: initialViewState.zoom,
+			maxZoom: initialViewState.maxZoom,
+			pitch: initialViewState.pitch,
+			bearing: initialViewState.bearing,
+			interactive: true
 		});
 
-		deckInstance = new Deck({
-			canvas: 'deck-canvas',
-			width: '100%',
-			height: '100%',
-			initialViewState: initialViewState,
-			controller: true,
-			onViewStateChange: ({ viewState }) => {
-				mapViewState.set(viewState);
-				map.jumpTo({
-					center: [viewState.longitude, viewState.latitude],
-					zoom: viewState.zoom,
-					bearing: viewState.bearing,
-					pitch: viewState.pitch
+		map.on('load', () => {
+			mapLoaded = true;
+
+			draw = new MapboxDraw({
+				displayControlsDefault: false,
+				controls: {
+					polygon: false,
+					point: false,
+					line_string: false,
+					trash: false
+				}
+			});
+
+			if ($editableGeoJSON.length > 0) {
+				draw.add({
+					type: 'FeatureCollection',
+					features: $editableGeoJSON
 				});
-			},
-			layers: []
+			}
 		});
 	});
 
+	// Function to handle drawn features from child component
+	function handleFeaturesUpdate(features: any) {}
+
 	onDestroy(() => {
-		deckInstance && deckInstance.finalize();
 		map && map.remove();
 	});
 </script>
 
 <div bind:this={container} class="map-container">
-	<canvas id="deck-canvas" class="absolute h-full w-full"></canvas>
+	{#if mapLoaded && map && draw}
+		<div class="absolute left-1/2 top-4 z-10 -translate-x-1/2 transform">
+			<DrawingTools {map} {draw} onFeaturesUpdate={handleFeaturesUpdate} />
+		</div>
+	{/if}
 </div>
 
 <style>

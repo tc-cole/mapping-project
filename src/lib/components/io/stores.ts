@@ -15,3 +15,5 @@ export const chosenDataset = writable<FileUpload | null>(
 );
 
 export const layers = new LayerStore();
+export const mapboxDrawInstance = writable<any>();
+export const editableGeoJSON = writable<any[]>([]);

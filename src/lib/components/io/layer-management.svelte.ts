@@ -17,8 +17,6 @@ import { H3HexagonLayer } from '@deck.gl/geo-layers';
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
 
-// src/lib/deck/layer-defs.ts
-
 export type LayerType = 'scatter' | 'geojson' | 'arc' | 'line' | 'path' | 'polygon' | 'h3' | 'text';
 //| 'trips';
 
