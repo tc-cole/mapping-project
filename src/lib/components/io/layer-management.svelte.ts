@@ -232,9 +232,6 @@ let slugCount = 0;
 function slug(base: string) {
 	return `${base.toLowerCase()}-${++slugCount}`;
 }
-/* -------------------------------------------------------------------------- */
-/* Singleton convenience export                                               */
-/* -------------------------------------------------------------------------- */
 
 export const layerDefs: Record<LayerType, LayerDef> = {
 	scatter: {
