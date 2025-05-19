@@ -10,7 +10,6 @@
 	<AppSidebar />
 
 	<ChartsSidebar />
-	<!-- Centered MenuBar -->
 </Sidebar.Provider>
 
 <DeckGL />
