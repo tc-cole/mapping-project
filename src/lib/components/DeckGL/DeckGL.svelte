@@ -7,9 +7,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import mapboxgl from 'mapbox-gl';
-	import 'mapbox-gl/dist/mapbox-gl.css'; // Import Mapbox GL CSS
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
-	import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'; // Import Draw CSS
 
 	import { layers, editableGeoJSON } from '$lib/components/io/stores';
 	import { mapViewState } from '$lib/components/io/layer-management.svelte';
@@ -33,7 +31,6 @@
 		bearing: 0
 	};
 
-	// Helper function to safely instantiate deck.gl layers
 	function safeCreateLayers(layerEntries: any[]) {
 		if (!layerEntries || !Array.isArray(layerEntries)) {
 			return [];
@@ -41,7 +38,6 @@
 
 		return layerEntries
 			.filter((entry) => {
-				// Filter out invalid layers (those without a constructor)
 				if (!entry || !entry.ctor) {
 					return false;
 				}
@@ -49,15 +45,12 @@
 			})
 			.map((entry) => {
 				try {
-					// Create a clean props object with only serializable values
 					const props = { ...entry.props };
 
-					// For safety, ensure required properties exist
 					if (!props.data) {
 						props.data = [];
 					}
 
-					// Create the layer instance
 					return new entry.ctor({
 						id: entry.id,
 						...props
@@ -67,19 +60,16 @@
 					return null;
 				}
 			})
-			.filter(Boolean); // Remove any null entries
+			.filter(Boolean);
 	}
 
 	$effect(() => {
-		if (!deckInstance || !map) return; // Early return if not initialized
-
+		if (!deckInstance || !map) return;
 		try {
 			const updatedLayers = safeCreateLayers($layers);
 
-			// Update deck instance with the new layers
 			deckInstance.setProps({
 				layers: updatedLayers
-				// Don't set viewState here as it's synced with Mapbox
 			});
 		} catch (error) {
 			console.error('Error updating deck layers:', error);
@@ -87,7 +77,6 @@
 	});
 
 	onMount(() => {
-		// Initialize Mapbox GL map first with an empty container
 		map = new mapboxgl.Map({
 			container: mapContainer,
 			style: 'mapbox://styles/mapbox/navigation-night-v1',
@@ -98,9 +87,7 @@
 			bearing: initialViewState.bearing
 		});
 
-		// Set up map load handler
 		map.on('load', () => {
-			// Initialize the MapboxDraw instance
 			draw = new MapboxDraw({
 				displayControlsDefault: false,
 				controls: {
@@ -109,18 +96,13 @@
 					line_string: false,
 					trash: false
 				}
-				// Explicitly include all drawing modes
-				//modes: MapboxDraw.modes
 			});
 
-			// Add the draw control to the map
 			map?.addControl(draw);
 
-			// Update the writable stores with the instances
 			mapInstance.set(map);
 			drawInstance.set(draw);
 
-			// Add any existing GeoJSON features
 			if ($editableGeoJSON.length > 0) {
 				draw.add({
 					type: 'FeatureCollection',
@@ -128,25 +110,21 @@
 				});
 			}
 
-			// Now create the Deck.gl instance as an overlay
 			deckInstance = new Deck({
 				canvas: deckCanvas,
 				width: '100%',
-				height: '100%',
+				height: '100%', //@ts-ignore
 				initialViewState: initialViewState,
-				controller: false, // Let Mapbox handle the controller
+				controller: false,
 				views: [new MapView()],
 				layers: [],
 				onViewStateChange: ({ viewState }: any) => {
-					// This typically won't fire since controller is false
 					mapViewState.set(viewState);
 				}
 			});
 
-			// Set up map move synchronization with Deck.gl
 			map?.on('move', () => {
-				if (!deckInstance) return;
-				if (!map) return;
+				if (!deckInstance || !map) return;
 				const { lng, lat } = map.getCenter();
 				const newViewState = {
 					longitude: lng,
@@ -157,19 +135,16 @@
 					maxZoom: initialViewState.maxZoom
 				};
 
-				// Update Deck.gl viewState
 				deckInstance.setProps({
 					viewState: newViewState
 				});
 
-				// Update the mapViewState store
 				mapViewState.set(newViewState);
 			});
 		});
 	});
 
 	onDestroy(() => {
-		// Clean up resources when component is destroyed
 		if (deckInstance) {
 			try {
 				deckInstance.finalize();
@@ -189,10 +164,7 @@
 </script>
 
 <div class="map-container-wrapper">
-	<!-- Mapbox container - must be empty when map initializes -->
 	<div bind:this={mapContainer} class="map-container"></div>
-
-	<!-- Deck.gl canvas overlay -->
 	<canvas bind:this={deckCanvas} class="deck-canvas"></canvas>
 </div>
 
