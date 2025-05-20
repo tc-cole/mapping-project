@@ -105,13 +105,7 @@
 	});
 </script>
 
-<div bind:this={container} class="map-container">
-	{#if mapLoaded && map && draw}
-		<div class="absolute left-1/2 top-4 z-10 -translate-x-1/2 transform">
-			<DrawingTools />
-		</div>
-	{/if}
-</div>
+<div bind:this={container} class="map-container"></div>
 
 <style>
 	.map-container {
