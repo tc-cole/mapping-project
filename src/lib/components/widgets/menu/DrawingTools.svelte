@@ -1,12 +1,6 @@
-<script lang="ts" module>
-	import { writable } from 'svelte/store';
-
-	export const openDrawer = writable<boolean>(false);
-	export const clickedGeoJSON = writable();
-</script>
-
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
+	import { clickedGeoJSON, openDrawer } from '$lib/components/io/stores';
 
 	// Define props with correct typing
 	let { map, draw, onFeaturesUpdate } = $props<{
@@ -49,14 +43,11 @@
 
 	// Handle creating new features
 	function handleDrawCreate(e: any) {
-		console.log('Feature created:', e.features);
 		drawnFeatures = [...drawnFeatures, ...e.features];
 		lastCompletedFeature = e.features[0];
 
-		// The drawing is complete when a feature is created
 		isDrawing = false;
 
-		// You can trigger any action you want when drawing is complete
 		onDrawingComplete(e.features[0]);
 	}
 
@@ -154,6 +145,8 @@
 		}
 	}
 </script>
+
+\
 
 <!-- Toolbar for quick access to editing tools - KEEPING ORIGINAL STYLING -->
 <div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">
