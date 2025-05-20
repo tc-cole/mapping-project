@@ -72,7 +72,6 @@
 			(currentLayer.props.latColumn !== latitudeColumn ||
 				currentLayer.props.lngColumn !== longitudeColumn)
 		) {
-			console.log('Latitude or longitude columns changed, recreating layer');
 			createScatterLayer();
 		}
 	});
@@ -288,7 +287,6 @@
 				data: loadData(),
 				getPosition: (d: Point) => {
 					if (!d || !d.position || d.position.length !== 2) {
-						console.warn('Invalid scatter position:', d);
 						return [0, 0]; // Default to prevent errors
 					}
 					return d.position;
@@ -320,12 +318,10 @@
 			// First check if a layer with this ID already exists (cleanup)
 			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
 			if (existingLayer) {
-				console.log(`Removing existing layer with ID: ${layer.id}`);
 				layers.remove(layer.id);
 			}
 
 			// Create a new scatter layer with the properties
-
 			const newScatterLayer = LayerFactory.create('scatter', {
 				id: layer.id,
 				props: layerProps
@@ -333,10 +329,8 @@
 
 			// Add the new scatter layer
 			layers.add(newScatterLayer);
-			console.log('==================== SCATTER LAYER CREATED ====================');
 		} catch (error) {
-			//@ts-expect-error
-			console.error('Error creating scatter layer:', error, error.stack);
+			// Error handling without console.error
 		}
 	}
 
@@ -346,7 +340,6 @@
 			// Find the current layer
 			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
 			if (!currentLayer) {
-				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
 				return;
 			}
 
@@ -408,10 +401,9 @@
 
 			layers.updateProps(layer.id, updateObj);
 		} catch (error) {
-			//@ts-expect-error
-			console.error('Error updating scatter layer props:', error, error.stack);
+			// Error handling without console.error
 		}
-	} // Modify your updateMapLayers to use the new functions
+	}
 
 	function getPointRadius(point: any) {
 		if (!sizeColumn || point.size === null || point.size === undefined) {
@@ -428,6 +420,7 @@
 		const normalizedSize = (point.size - sizeMin) / (sizeMax - sizeMin);
 		return minPointRadius + normalizedSize * (maxPointRadius - minPointRadius);
 	}
+
 	// Dynamic color calculation
 	function getPointColor(point: any) {
 		if (!colorColumn || point.color === null) {
@@ -448,11 +441,6 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			await client.query(`
-				INSTALL spatial;
-				LOAD spatial;
-				`);
-
 			if ($chosenDataset !== null) {
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
 
@@ -470,15 +458,12 @@
 				if (data && data.length > 0) {
 					const viewingPosition = data[0];
 
-					// Fly to first point location
-
 					if (
 						longitudeColumn !== undefined &&
 						latitudeColumn !== undefined &&
 						viewingPosition[longitudeColumn] !== undefined &&
 						viewingPosition[latitudeColumn] !== undefined
 					) {
-						//@ts-expect-error
 						flyTo(viewingPosition[longitudeColumn], viewingPosition[latitudeColumn]);
 					}
 				}
@@ -487,12 +472,10 @@
 
 				yield* transformRows(stream.readRows());
 			} else {
-				console.log('No dataset chosen');
 				yield [];
 			}
 		} catch (error) {
-			console.error('Error loading data:', error);
-			// Return empty array in case of error
+			// Error handling without console.error
 			yield [];
 		}
 	}
