@@ -8,7 +8,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import mapboxgl from 'mapbox-gl';
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
-	import DrawingTools from '$lib/components/widgets/menu/DrawingTools.svelte';
+
 	import { layers, editableGeoJSON } from '$lib/components/io/stores';
 	import { mapViewState } from '$lib/components/io/layer-management.svelte';
 	import { Deck } from '@deck.gl/core';
@@ -17,9 +17,8 @@
 		'pk.eyJ1IjoiYXJwZXJ5YW4iLCJhIjoiY2l4cTJkc2t6MDAzcjJxcG9maWp1ZmFjMCJ9.XT957ywrTABjNFqGdp_37g';
 
 	let map: mapboxgl.Map | undefined = $state();
-	let container: HTMLElement;
+	let container: any;
 	let draw: MapboxDraw | undefined = $state();
-	let mapLoaded = $state(false);
 
 	const initialViewState = {
 		longitude: -74,
@@ -32,13 +31,34 @@
 	let deckInstance: any;
 
 	$effect(() => {
-		const updatedLayers = $layers
-			.filter((e) => e.ctor) //@ts-ignore
-			.map((e) => new e.ctor({ id: e.id, ...e.props }));
-		if ($layers.length > 0 && deckInstance)
-			deckInstance.setProps({ layers: updatedLayers, viewState: $mapViewState });
-	});
+		if (!deckInstance) return; // Early return if not initialized
 
+		try {
+			// Filter out invalid layers (those without a constructor)
+			const validLayers = $layers.filter((e) => e.ctor);
+
+			// Create layer instances from valid layer entries
+			const updatedLayers = validLayers
+				.map((e) => {
+					try {
+						//@ts-ignore
+						return new e.ctor({ id: e.id, ...e.props });
+					} catch (error) {
+						console.error(`Failed to instantiate layer ${e.id}:`, error);
+						return null;
+					}
+				})
+				.filter(Boolean); // Remove any null entries
+
+			// Update deck instance with the new layers
+			deckInstance.setProps({
+				layers: updatedLayers,
+				viewState: $mapViewState
+			});
+		} catch (error) {
+			console.error('Error updating deck layers:', error);
+		}
+	});
 	onMount(() => {
 		map = new mapboxgl.Map({
 			container: container,
@@ -52,8 +72,6 @@
 		});
 
 		map.on('load', () => {
-			mapLoaded = true;
-
 			draw = new MapboxDraw({
 				displayControlsDefault: false,
 				controls: {
@@ -78,6 +96,7 @@
 		});
 
 		deckInstance = new Deck({
+			id: 'basemap',
 			canvas: 'deck-canvas',
 			width: '100%',
 			height: '100%',
@@ -96,11 +115,8 @@
 		});
 	});
 
-	// Function to handle drawn features from child component
-
 	onDestroy(() => {
 		deckInstance && deckInstance.finalize();
-
 		map && map.remove();
 	});
 </script>
@@ -112,5 +128,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: 0;
+		height: 100%;
+		width: 100%;
 	}
 </style>

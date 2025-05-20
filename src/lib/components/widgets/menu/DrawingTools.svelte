@@ -2,6 +2,10 @@
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
 	import { clickedGeoJSON, openDrawer } from '$lib/components/io/stores';
 	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
+	import { MaskExtension } from '@deck.gl/extensions';
+
+	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+	import { layers } from '$lib/components/io/stores';
 
 	// Define props with correct typing
 
@@ -108,10 +112,49 @@
 
 	// Function that runs whenever a drawing is completed
 	function onDrawingComplete(feature: any) {
-		console.log('Drawing completed!', feature);
-		// You can perform any actions here, such as:
+		// Create a mask layer with the drawn feature
+		const maskLayerId = `mask-${Date.now()}`;
+		const geojsonMaskLayer = LayerFactory.create('geojson', {
+			id: maskLayerId,
+			props: {
+				operation: 'mask',
+				data: feature,
+				// Optional additional styling if needed
+				stroked: true,
+				filled: true,
+				lineWidthMinPixels: 2,
+				getLineColor: [255, 255, 255],
+				getFillColor: [0, 0, 0, 0] // Transparent fill
+			}
+		});
+
+		// Add the mask layer to the deck
+		layers.add(geojsonMaskLayer);
+
+		// Now apply the mask extension to all existing layers that should be masked
+		const layersSnapshot = layers.snapshot;
+
+		// Use a transaction to batch all updates
+		layers.transaction(() => {
+			// Loop through layers
+			for (const layer of layersSnapshot) {
+				// Skip the mask layer itself and any layers you don't want to mask
+				if (layer.id === maskLayerId || layer.id.includes('basemap')) {
+					continue;
+				}
+
+				// Apply the mask extension
+				layers.updateProps(layer.id, {
+					extensions: [new MaskExtension()],
+					maskId: maskLayerId
+					// Optional: control how masking works
+					// maskByInstance: true or false depending on the layer type
+				});
+			}
+		});
+
+		// You can perform any additional actions here, such as:
 		// - Saving to a database
-		// - Adding to a DeckGL layer
 		// - Showing details in the UI
 		// - etc.
 	}

@@ -46,10 +46,10 @@
 	},
 	"dependencies": {
 		"@deck.gl-community/editable-layers": "^9.0.3",
-		"@deck.gl/core": "^9.1.11",
-		"@deck.gl/extensions": "^9.1.11",
+		"@deck.gl/core": "^9.1.12",
+		"@deck.gl/extensions": "^9.1.12",
 		"@deck.gl/geo-layers": "^9.1.11",
-		"@deck.gl/layers": "^9.1.11",
+		"@deck.gl/layers": "^9.1.12",
 		"@deck.gl/mapbox": "^9.1.11",
 		"@duckdb/duckdb-wasm": "^1.29.1-dev132.0",
 		"@duckdb/node-api": "^1.2.2-alpha.18",

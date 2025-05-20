@@ -266,6 +266,7 @@ export const layerDefs: Record<LayerType, LayerDef> = {
 		}
 	},
 	*/
+
 	geojson: {
 		label: 'geojson',
 		ctor: GeoJsonLayer,
