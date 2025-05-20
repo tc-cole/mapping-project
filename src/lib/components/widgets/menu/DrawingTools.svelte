@@ -1,13 +1,9 @@
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
 	import { clickedGeoJSON, openDrawer } from '$lib/components/io/stores';
+	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	// Define props with correct typing
-	let { map, draw, onFeaturesUpdate } = $props<{
-		map: mapboxgl.Map | undefined;
-		draw: MapboxDraw | undefined;
-		onFeaturesUpdate: Function;
-	}>();
 
 	let drawnFeatures = $state<any[]>([]);
 	let activeEditTool = $state('simple_select');
@@ -15,28 +11,28 @@
 	let lastCompletedFeature = $state<any>(null);
 
 	$effect(() => {
-		if (map && draw) {
+		if ($mapInstance && $drawInstance) {
 			// Set up event handlers for draw actions
-			map.on('draw.create', handleDrawCreate);
-			map.on('draw.update', handleDrawUpdate);
-			map.on('draw.delete', handleDrawDelete);
-			map.on('draw.modechange', handleModeChange);
-			map.on('draw.selectionchange', handleSelectionChange);
+			$mapInstance.on('draw.create', handleDrawCreate);
+			$mapInstance.on('draw.update', handleDrawUpdate);
+			$mapInstance.on('draw.delete', handleDrawDelete);
+			$mapInstance.on('draw.modechange', handleModeChange);
+			$mapInstance.on('draw.selectionchange', handleSelectionChange);
 
 			// These events track the drawing state
-			map.on('draw.render', handleDrawRender);
-			map.on('mouseup', handleMouseUp);
-			map.on('touchend', handleTouchEnd);
+			$mapInstance.on('draw.render', handleDrawRender);
+			$mapInstance.on('mouseup', handleMouseUp);
+			$mapInstance.on('touchend', handleTouchEnd);
 
 			return () => {
-				map.off('draw.create', handleDrawCreate);
-				map.off('draw.update', handleDrawUpdate);
-				map.off('draw.delete', handleDrawDelete);
-				map.off('draw.modechange', handleModeChange);
-				map.off('draw.selectionchange', handleSelectionChange);
-				map.off('draw.render', handleDrawRender);
-				map.off('mouseup', handleMouseUp);
-				map.off('touchend', handleTouchEnd);
+				$mapInstance.off('draw.create', handleDrawCreate);
+				$mapInstance.off('draw.update', handleDrawUpdate);
+				$mapInstance.off('draw.delete', handleDrawDelete);
+				$mapInstance.off('draw.modechange', handleModeChange);
+				$mapInstance.off('draw.selectionchange', handleSelectionChange);
+				$mapInstance.off('draw.render', handleDrawRender);
+				$mapInstance.off('mouseup', handleMouseUp);
+				$mapInstance.off('touchend', handleTouchEnd);
 			};
 		}
 	});
@@ -91,9 +87,9 @@
 
 	function handleMouseUp(e: any) {
 		if (isDrawing) {
-			const currentFeatures = draw?.getAll().features || [];
+			const currentFeatures = $drawInstance?.getAll().features || [];
 			const inProgressFeature = currentFeatures.find(
-				(f: any) => f.id === draw?.getSelectedIds()[0]
+				(f: any) => f.id === $drawInstance?.getSelectedIds()[0]
 			);
 
 			if (inProgressFeature) {
@@ -121,9 +117,9 @@
 	}
 
 	function setDrawMode(mode: string) {
-		if (draw) {
+		if ($drawInstance) {
 			try {
-				draw.changeMode(mode);
+				$drawInstance.changeMode(mode);
 				activeEditTool = mode;
 			} catch (error) {
 				console.error('Error changing draw mode:', error);
@@ -134,9 +130,9 @@
 	}
 
 	function trashSelected() {
-		if (draw) {
+		if ($drawInstance) {
 			try {
-				draw.trash();
+				$drawInstance.trash();
 			} catch (error) {
 				console.error('Error deleting features:', error);
 			}
@@ -145,8 +141,6 @@
 		}
 	}
 </script>
-
-\
 
 <!-- Toolbar for quick access to editing tools - KEEPING ORIGINAL STYLING -->
 <div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">

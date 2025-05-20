@@ -1,3 +1,9 @@
+<script module lang="ts">
+	import { writable } from 'svelte/store';
+	export const mapInstance = writable<mapboxgl.Map | undefined>();
+	export const drawInstance = writable<MapboxDraw | undefined>();
+</script>
+
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import mapboxgl from 'mapbox-gl';
@@ -60,6 +66,9 @@
 
 			map?.addControl(draw);
 
+			mapInstance.set(map);
+			drawInstance.set(draw);
+
 			if ($editableGeoJSON.length > 0) {
 				draw.add({
 					type: 'FeatureCollection',
@@ -88,7 +97,6 @@
 	});
 
 	// Function to handle drawn features from child component
-	function handleFeaturesUpdate(features: any) {}
 
 	onDestroy(() => {
 		deckInstance && deckInstance.finalize();
@@ -100,7 +108,7 @@
 <div bind:this={container} class="map-container">
 	{#if mapLoaded && map && draw}
 		<div class="absolute left-1/2 top-4 z-10 -translate-x-1/2 transform">
-			<DrawingTools {map} {draw} onFeaturesUpdate={handleFeaturesUpdate} />
+			<DrawingTools />
 		</div>
 	{/if}
 </div>
