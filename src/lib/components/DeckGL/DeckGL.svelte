@@ -112,7 +112,6 @@
 		});
 	
 		map?.addControl(draw);
-		console.log(draw)
 	
 		mapInstance.set(map);
 		drawInstance.set(draw);

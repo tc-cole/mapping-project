@@ -15,7 +15,12 @@
 	let lastCompletedFeature = $state<any>(null);
 
 	$effect(() => {
+		console.log("Map instance:", $mapInstance);
+    	console.log("Draw instance:", $drawInstance);
+    
 		if ($mapInstance && $drawInstance) {
+			console.log("Both map and draw instances are available");
+
 			// Set up event handlers for draw actions
 			$mapInstance.on('draw.create', handleDrawCreate);
 			$mapInstance.on('draw.update', handleDrawUpdate);
@@ -38,11 +43,17 @@
 				$mapInstance.off('mouseup', handleMouseUp);
 				$mapInstance.off('touchend', handleTouchEnd);
 			};
-		}
+		} else {
+      	console.log("Missing required instances:", {
+        mapAvailable: !!$mapInstance,
+        drawAvailable: !!$drawInstance
+      });
+    }
 	});
 
 	// Handle creating new features
 	function handleDrawCreate(e: any) {
+		console.log("draw create")
 		drawnFeatures = [...drawnFeatures, ...e.features];
 		lastCompletedFeature = e.features[0];
 
@@ -160,17 +171,21 @@
 	}
 
 	function setDrawMode(mode: string) {
+		console.log("Attempting to set draw mode to:", mode);
 		if ($drawInstance) {
-			try {
-				$drawInstance.changeMode(mode);
-				activeEditTool = mode;
-			} catch (error) {
-				console.error('Error changing draw mode:', error);
-			}
-		} else {
-			console.warn('Draw object not initialized yet');
+		try {
+			console.log("Draw instance methods:", Object.keys($drawInstance));
+			$drawInstance.changeMode(mode);
+			console.log("Mode changed successfully to:", mode);
+			activeEditTool = mode;
+		} catch (error) {
+			console.error('Error changing draw mode:', error);
 		}
-	}
+		} else {
+		console.warn('Draw object not initialized yet');
+		}
+  	}
+  
 
 	function trashSelected() {
 		if ($drawInstance) {
