@@ -159,8 +159,6 @@
 
 	// In your layer management
 	// In your layer management
-
-	/**
 	function toggleMaskMode(layerId: string) {
 		// Find the layer
 		const layer = layers.snapshot.find((l) => l.id === layerId);
@@ -228,7 +226,6 @@
 			});
 		}
 	}
-		*/
 	// Enhanced GeoJSON transformer function
 	async function* transformRows(rows: AsyncIterable<any[]>) {
 		console.log('Starting GeoJSON transformRows with columns:', {

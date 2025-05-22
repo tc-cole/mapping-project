@@ -67,7 +67,7 @@
 		if (!deckInstance || !map) return;
 		try {
 			const updatedLayers = safeCreateLayers($layers);
-
+			console.log(updatedLayers);
 			deckInstance.setProps({
 				layers: updatedLayers
 			});

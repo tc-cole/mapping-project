@@ -67,7 +67,6 @@
 	}
 
 	function handleModeChange(e: any) {
-		console.log(e);
 		activeEditTool = e.mode;
 
 		isDrawing = e.mode.startsWith('draw_');
@@ -88,6 +87,30 @@
 		if (activeEditTool.startsWith('draw_') && !activeEditTool.includes('select')) {
 			isDrawing = true;
 		}
+	}
+
+	// Test function to create a polygon mask over part of Manhattan
+	function createTestMask() {
+		// Rectangle covering part of Midtown Manhattan
+		const manhattanPolygon = {
+			type: 'Feature',
+			properties: {},
+			geometry: {
+				type: 'Polygon',
+				coordinates: [
+					[
+						[-73.99, 40.75], // Southwest corner
+						[-73.97, 40.75], // Southeast corner
+						[-73.97, 40.77], // Northeast corner
+						[-73.99, 40.77], // Northwest corner
+						[-73.99, 40.75] // Close the polygon
+					]
+				]
+			}
+		};
+
+		// Call your mask creation function with this polygon
+		onDrawingComplete(manhattanPolygon);
 	}
 
 	function handleMouseUp(e: any) {
@@ -111,33 +134,36 @@
 		handleMouseUp(e);
 	}
 
-	// Function that runs whenever a drawing is completed
 	function onDrawingComplete(feature: any) {
-		// Create a mask layer with the drawn feature
+		if (!feature || !feature.geometry) {
+			console.error('Invalid feature drawn');
+			return;
+		}
+
 		const maskLayerId = `mask-${Date.now()}`;
-		const geojsonMaskLayer = LayerFactory.create('geojson', {
+
+		// Create and add the mask layer
+		const maskLayer = LayerFactory.create('geojson', {
 			id: maskLayerId,
 			props: {
 				operation: 'mask',
 				data: feature,
-				// Optional additional styling if needed
 				stroked: true,
 				filled: true,
+				visible: false,
 				lineWidthMinPixels: 2,
 				getLineColor: [255, 255, 255],
-				getFillColor: [0, 0, 0, 0] // Transparent fill
+				getFillColor: [0, 0, 0, 0]
 			}
 		});
 
-		// Add the mask layer to the deck
-		layers.add(geojsonMaskLayer);
+		layers.add(maskLayer);
 
-		// Now apply the mask extension to all existing layers that should be masked
-		const layersSnapshot = layers.snapshot;
+		// Get all existing layers
+		const layersSnapshot = [...layers.snapshot];
 
-		// Use a transaction to batch all updates
+		// Remove and recreate each layer with masks applied
 		layers.transaction(() => {
-			// Loop through layers
 			for (const layer of layersSnapshot) {
 				// Skip the mask layer itself and any layers you don't want to mask
 				if (layer.id === maskLayerId || layer.id.includes('basemap')) {
@@ -153,11 +179,6 @@
 				});
 			}
 		});
-
-		// You can perform any additional actions here, such as:
-		// - Saving to a database
-		// - Showing details in the UI
-		// - etc.
 	}
 
 	function setDrawMode(mode: string) {
@@ -188,6 +209,13 @@
 
 <!-- Toolbar for quick access to editing tools - KEEPING ORIGINAL STYLING -->
 <div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">
+	<button
+		class="rounded bg-purple-600 p-2 text-white"
+		title="Test Mask in Manhattan"
+		onclick={createTestMask}
+	>
+		Test NYC Mask
+	</button>
 	<!-- Selection/Modify Tool -->
 	<button
 		class={`rounded p-2 ${activeEditTool === 'simple_select' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
