@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import SidebarLayerEditor from './components/editable-layer.svelte';
+	import SidebarLayerEditor from './components/layer-editor.svelte';
+	//import SidebarFilterEditor from './components/filter-editor.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import AddDataset from './components/add-dataset.svelte';
@@ -15,6 +16,7 @@
 <Sidebar.Root>
 	<Sidebar.Content>
 		<AddDataset />
+		<Sidebar.Separator></Sidebar.Separator>
 
 		<Sidebar.Group class="-px-4">
 			<Button onclick={addLayer}>

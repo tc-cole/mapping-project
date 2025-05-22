@@ -1,18 +1,9 @@
-<script lang="ts" module>
-	import { writable } from 'svelte/store';
-
-	export const openDrawer = writable<boolean>(false);
-</script>
-
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
+	import { clickedGeoJSON, openDrawer } from '$lib/components/io/stores';
+	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	// Define props with correct typing
-	let { map, draw, onFeaturesUpdate } = $props<{
-		map: mapboxgl.Map | undefined;
-		draw: MapboxDraw | undefined;
-		onFeaturesUpdate: Function;
-	}>();
 
 	let drawnFeatures = $state<any[]>([]);
 	let activeEditTool = $state('simple_select');
@@ -20,48 +11,43 @@
 	let lastCompletedFeature = $state<any>(null);
 
 	$effect(() => {
-		if (map && draw) {
+		if ($mapInstance && $drawInstance) {
 			// Set up event handlers for draw actions
-			map.on('draw.create', handleDrawCreate);
-			map.on('draw.update', handleDrawUpdate);
-			map.on('draw.delete', handleDrawDelete);
-			map.on('draw.modechange', handleModeChange);
-			map.on('draw.selectionchange', handleSelectionChange);
+			$mapInstance.on('draw.create', handleDrawCreate);
+			$mapInstance.on('draw.update', handleDrawUpdate);
+			$mapInstance.on('draw.delete', handleDrawDelete);
+			$mapInstance.on('draw.modechange', handleModeChange);
+			$mapInstance.on('draw.selectionchange', handleSelectionChange);
 
 			// These events track the drawing state
-			map.on('draw.render', handleDrawRender);
-			map.on('mouseup', handleMouseUp);
-			map.on('touchend', handleTouchEnd);
+			$mapInstance.on('draw.render', handleDrawRender);
+			$mapInstance.on('mouseup', handleMouseUp);
+			$mapInstance.on('touchend', handleTouchEnd);
 
 			return () => {
-				console.log('Cleaning up map event handlers');
-				map.off('draw.create', handleDrawCreate);
-				map.off('draw.update', handleDrawUpdate);
-				map.off('draw.delete', handleDrawDelete);
-				map.off('draw.modechange', handleModeChange);
-				map.off('draw.selectionchange', handleSelectionChange);
-				map.off('draw.render', handleDrawRender);
-				map.off('mouseup', handleMouseUp);
-				map.off('touchend', handleTouchEnd);
+				$mapInstance.off('draw.create', handleDrawCreate);
+				$mapInstance.off('draw.update', handleDrawUpdate);
+				$mapInstance.off('draw.delete', handleDrawDelete);
+				$mapInstance.off('draw.modechange', handleModeChange);
+				$mapInstance.off('draw.selectionchange', handleSelectionChange);
+				$mapInstance.off('draw.render', handleDrawRender);
+				$mapInstance.off('mouseup', handleMouseUp);
+				$mapInstance.off('touchend', handleTouchEnd);
 			};
 		}
 	});
 
 	// Handle creating new features
 	function handleDrawCreate(e: any) {
-		console.log('Feature created:', e.features);
 		drawnFeatures = [...drawnFeatures, ...e.features];
 		lastCompletedFeature = e.features[0];
 
-		// The drawing is complete when a feature is created
 		isDrawing = false;
 
-		// You can trigger any action you want when drawing is complete
 		onDrawingComplete(e.features[0]);
 	}
 
 	function handleDrawUpdate(e: any) {
-		console.log('Feature updated:', e.features);
 		const updatedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = [...drawnFeatures.filter((f) => !updatedIds.includes(f.id)), ...e.features];
 		lastCompletedFeature = e.features[0];
@@ -71,14 +57,12 @@
 	}
 
 	function handleDrawDelete(e: any) {
-		console.log('Feature deleted:', e.features);
 		const deletedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = drawnFeatures.filter((f) => !deletedIds.includes(f.id));
 		lastCompletedFeature = null;
 	}
 
 	function handleModeChange(e: any) {
-		console.log('Mode changed:', e.mode);
 		activeEditTool = e.mode;
 
 		isDrawing = e.mode.startsWith('draw_');
@@ -89,7 +73,8 @@
 	}
 
 	function handleSelectionChange(e: any) {
-		console.log('Selection changed:', e.features);
+		openDrawer.set(true);
+		clickedGeoJSON.set(e.features[0]);
 	}
 
 	// This event fires continuously during drawing
@@ -99,11 +84,35 @@
 		}
 	}
 
+	// Test function to create a polygon mask over part of Manhattan
+	function createTestMask() {
+		// Rectangle covering part of Midtown Manhattan
+		const manhattanPolygon = {
+			type: 'Feature',
+			properties: {},
+			geometry: {
+				type: 'Polygon',
+				coordinates: [
+					[
+						[-73.99, 40.75], // Southwest corner
+						[-73.97, 40.75], // Southeast corner
+						[-73.97, 40.77], // Northeast corner
+						[-73.99, 40.77], // Northwest corner
+						[-73.99, 40.75] // Close the polygon
+					]
+				]
+			}
+		};
+
+		// Call your mask creation function with this polygon
+		onDrawingComplete(manhattanPolygon);
+	}
+
 	function handleMouseUp(e: any) {
 		if (isDrawing) {
-			const currentFeatures = draw?.getAll().features || [];
+			const currentFeatures = $drawInstance?.getAll().features || [];
 			const inProgressFeature = currentFeatures.find(
-				(f: any) => f.id === draw?.getSelectedIds()[0]
+				(f: any) => f.id === $drawInstance?.getSelectedIds()[0]
 			);
 
 			if (inProgressFeature) {
@@ -120,22 +129,19 @@
 		handleMouseUp(e);
 	}
 
-	// Function that runs whenever a drawing is completed
 	function onDrawingComplete(feature: any) {
-		console.log('Drawing completed!', feature);
-		// You can perform any actions here, such as:
-		// - Saving to a database
-		// - Adding to a DeckGL layer
-		// - Showing details in the UI
-		// - etc.
+		if (!feature || !feature.geometry) {
+			console.error('Invalid feature drawn');
+			return;
+		}
 
-		openDrawer.set(true);
+		clickedGeoJSON.set(feature);
 	}
 
 	function setDrawMode(mode: string) {
-		if (draw) {
+		if ($drawInstance) {
 			try {
-				draw.changeMode(mode);
+				$drawInstance.changeMode(mode);
 				activeEditTool = mode;
 			} catch (error) {
 				console.error('Error changing draw mode:', error);
@@ -146,9 +152,9 @@
 	}
 
 	function trashSelected() {
-		if (draw) {
+		if ($drawInstance) {
 			try {
-				draw.trash();
+				$drawInstance.trash();
 			} catch (error) {
 				console.error('Error deleting features:', error);
 			}

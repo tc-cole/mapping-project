@@ -7,6 +7,7 @@
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Sectional from './utils/sectional.svelte';
+	import { MaskExtension } from '@deck.gl/extensions';
 
 	const CHUNK_SIZE = 100000;
 
@@ -156,6 +157,77 @@
 		}
 	});
 
+	// In your layer management
+	// In your layer management
+	/*
+	function toggleMaskMode(layerId: string) {
+		// Find the layer
+		const layer = layers.snapshot.find((l) => l.id === layerId);
+		if (!layer) return;
+
+		// Check if currently in mask mode
+		const isCurrentlyMask = layer.props?.operation === 'mask';
+
+		if (isCurrentlyMask) {
+			// Turn off mask mode
+			layers.updateProps(layerId, {
+				operation: undefined,
+				visible: true,
+				// Reset appearance to standard GeoJSON look
+				stroked: true,
+				filled: true,
+				getFillColor: [0, 128, 255, 128],
+				getLineColor: [0, 0, 0]
+			});
+
+			// Remove masking from layers
+			const layerSnapshot = layers.snapshot;
+			layers.transaction(() => {
+				for (const l of layerSnapshot) {
+					if (l.props?.maskId === layerId) {
+						layers.updateProps(l.id, {
+							extensions: [],
+							maskId: undefined
+						});
+					}
+				}
+			});
+		} else {
+			// Turn on mask mode
+			layers.updateProps(layerId, {
+				operation: 'mask',
+				visible: false,
+				// Set mask appearance
+				stroked: true,
+				lineWidthMinPixels: 2,
+				getLineColor: [255, 255, 255],
+				getFillColor: [0, 0, 0, 0] // Transparent
+			});
+
+			// Apply mask to layers
+			const layerSnapshot = layers.snapshot;
+			layers.transaction(() => {
+				for (const l of layerSnapshot) {
+					// Skip incompatible layers
+					if (
+						l.id === layerId ||
+						l.props?.operation === 'mask' ||
+						l.ctor?.name === 'CPUGridLayer' ||
+						l.ctor?.name === 'HexagonLayer'
+					) {
+						continue;
+					}
+
+					// Apply mask
+					layers.updateProps(l.id, {
+						extensions: [new MaskExtension()],
+						maskId: layerId
+					});
+				}
+			});
+		}
+	}
+	*/
 	// Enhanced GeoJSON transformer function
 	async function* transformRows(rows: AsyncIterable<any[]>) {
 		console.log('Starting GeoJSON transformRows with columns:', {
@@ -651,6 +723,17 @@
 </script>
 
 <Sectional label="GeoJSON">
+	<!--
+	<label class="flex items-center space-x-2">
+		<input
+			type="checkbox"
+			checked={layer.props?.operation === 'mask'}
+			onchange={() => toggleMaskMode(layer.id)}
+			class="form-checkbox h-4 w-4 text-blue-600"
+		/>
+		<span class="text-sm text-gray-200">Filter other layers with this shape</span>
+	</label>
+	-->
 	<ColumnDropdown bind:chosenColumn={geojsonColumn} default_column="GeoJSON" />
 	{#if !requiredColumnsSelected}
 		<div class="mt-2 text-amber-500">Please select a GeoJSON column to display data.</div>

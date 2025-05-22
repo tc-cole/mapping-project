@@ -1,18 +1,25 @@
+<script module lang="ts">
+	import { writable } from 'svelte/store';
+	export const mapInstance = writable<mapboxgl.Map | undefined>();
+	export const drawInstance = writable<MapboxDraw | undefined>();
+</script>
+
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
-	import mapboxgl from 'mapbox-gl';
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
-	import DrawingTools from '$lib/components/widgets/menu/DrawingTools.svelte';
-	import { layers, editableGeoJSON } from '$lib/components/io/stores';
-	import { mapViewState } from '$lib/components/io/layer-management.svelte';
+	import mapboxgl from 'mapbox-gl';
+
+	import { layers, editableGeoJSON, mapViewState } from '$lib/components/io/stores';
+	import { Deck, MapView } from '@deck.gl/core';
+	import { onDestroy, onMount } from 'svelte';
 
 	mapboxgl.accessToken =
 		'pk.eyJ1IjoiYXJwZXJ5YW4iLCJhIjoiY2l4cTJkc2t6MDAzcjJxcG9maWp1ZmFjMCJ9.XT957ywrTABjNFqGdp_37g';
 
+	let mapContainer: HTMLElement;
+	let deckCanvas: HTMLCanvasElement;
 	let map: mapboxgl.Map | undefined = $state();
-	let container: HTMLElement;
 	let draw: MapboxDraw | undefined = $state();
-	let mapLoaded = $state(false);
+	let deckInstance = $state<any>();
 
 	const initialViewState = {
 		longitude: -74,
@@ -22,31 +29,64 @@
 		pitch: 0,
 		bearing: 0
 	};
-	let deckInstance: any;
+
+	function safeCreateLayers(layerEntries: any[]) {
+		if (!layerEntries || !Array.isArray(layerEntries)) {
+			return [];
+		}
+
+		return layerEntries
+			.filter((entry) => {
+				if (!entry || !entry.ctor) {
+					return false;
+				}
+				return true;
+			})
+			.map((entry) => {
+				try {
+					const props = { ...entry.props };
+
+					if (!props.data) {
+						props.data = [];
+					}
+
+					return new entry.ctor({
+						id: entry.id,
+						...props
+					});
+				} catch (error) {
+					console.error(`Error creating layer ${entry.id}:`, error);
+					return null;
+				}
+			})
+			.filter(Boolean);
+	}
 
 	$effect(() => {
-		const updatedLayers = $layers
-			.filter((e) => e.ctor) //@ts-ignore
-			.map((e) => new e.ctor({ id: e.id, ...e.props }));
-		if ($layers.length > 0 && deckInstance)
-			deckInstance.setProps({ layers: updatedLayers, viewState: $mapViewState });
+		if (!deckInstance || !map) return;
+		try {
+			const updatedLayers = safeCreateLayers($layers);
+			console.log(updatedLayers);
+			deckInstance.setProps({
+				layers: updatedLayers
+			});
+		} catch (error) {
+			console.error('Error updating deck layers:', error);
+		}
 	});
 
 	onMount(() => {
 		map = new mapboxgl.Map({
-			container: container,
+			container: mapContainer,
 			style: 'mapbox://styles/mapbox/navigation-night-v1',
 			center: [initialViewState.longitude, initialViewState.latitude],
 			zoom: initialViewState.zoom,
 			maxZoom: initialViewState.maxZoom,
 			pitch: initialViewState.pitch,
-			bearing: initialViewState.bearing,
-			interactive: true
+			bearing: initialViewState.bearing
 		});
 
 		map.on('load', () => {
-			mapLoaded = true;
-
 			draw = new MapboxDraw({
 				displayControlsDefault: false,
 				controls: {
@@ -59,35 +99,95 @@
 
 			map?.addControl(draw);
 
+			mapInstance.set(map);
+			drawInstance.set(draw);
+
 			if ($editableGeoJSON.length > 0) {
 				draw.add({
 					type: 'FeatureCollection',
 					features: $editableGeoJSON
 				});
 			}
+
+			deckInstance = new Deck({
+				canvas: deckCanvas,
+				width: '100%',
+				height: '100%', //@ts-ignore
+				initialViewState: initialViewState,
+				controller: false,
+				views: [new MapView()],
+				layers: [],
+				onViewStateChange: ({ viewState }: any) => {
+					mapViewState.set(viewState);
+				}
+			});
+
+			map?.on('move', () => {
+				if (!deckInstance || !map) return;
+				const { lng, lat } = map.getCenter();
+				const newViewState = {
+					longitude: lng,
+					latitude: lat,
+					zoom: map.getZoom(),
+					pitch: map.getPitch(),
+					bearing: map.getBearing(),
+					maxZoom: initialViewState.maxZoom
+				};
+
+				deckInstance.setProps({
+					viewState: newViewState
+				});
+
+				mapViewState.set(newViewState);
+			});
 		});
 	});
 
-	// Function to handle drawn features from child component
-	function handleFeaturesUpdate(features: any) {}
-
 	onDestroy(() => {
-		map && map.remove();
+		if (deckInstance) {
+			try {
+				deckInstance.finalize();
+			} catch (error) {
+				console.error('Error finalizing Deck instance:', error);
+			}
+		}
+
+		if (map) {
+			try {
+				map.remove();
+			} catch (error) {
+				console.error('Error removing map:', error);
+			}
+		}
 	});
 </script>
 
-<div bind:this={container} class="map-container">
-	{#if mapLoaded && map && draw}
-		<div class="absolute left-1/2 top-4 z-10 -translate-x-1/2 transform">
-			<DrawingTools {map} {draw} onFeaturesUpdate={handleFeaturesUpdate} />
-		</div>
-	{/if}
+<div class="map-container-wrapper">
+	<div bind:this={mapContainer} class="map-container"></div>
+	<canvas bind:this={deckCanvas} class="deck-canvas"></canvas>
 </div>
 
 <style>
-	.map-container {
+	.map-container-wrapper {
 		position: fixed;
 		inset: 0;
+		width: 100%;
+		height: 100%;
 		z-index: 0;
+	}
+
+	.map-container {
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		z-index: 1;
+	}
+
+	.deck-canvas {
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		z-index: 2;
+		pointer-events: none; /* Let clicks pass through to the map */
 	}
 </style>
