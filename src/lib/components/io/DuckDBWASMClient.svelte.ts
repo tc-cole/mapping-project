@@ -736,6 +736,7 @@ export class SingletonDatabase {
 	private client: DuckDBClient | null = null;
 	private sources: SourceMap = {};
 	private options: DuckDBOpenOptions = {};
+	private extensionsLoaded = false;
 
 	/* 🟢 2) ——— make ctor private ——— */
 	private constructor(opts: DuckDBOpenOptions = {}) {
@@ -759,6 +760,8 @@ export class SingletonDatabase {
 	async init(): Promise<DuckDBClient> {
 		if (!this.client) {
 			this.client = await DuckDBClient.create(this.sources, this.options);
+
+			await this.loadCoreExtensions();
 		}
 		return this.client;
 	}
@@ -773,7 +776,18 @@ export class SingletonDatabase {
 		return SingletonDatabase._instance;
 	}
 
+	private async loadCoreExtensions() {
+		if (this.extensionsLoaded || !this.client) return;
+
+		await this.client.query(`INSTALL spatial;`);
+		await this.client.query(`LOAD spatial;`);
+		this.extensionsLoaded = true;
+	}
+
 	async addExtension(extension: string): Promise<void> {
+		if (!this.client) {
+			throw new Error('Database must be initialized before adding extensions');
+		}
 		try {
 			await this.client?.query(`
 				INSTALL ${extension};
@@ -783,6 +797,26 @@ export class SingletonDatabase {
 			throw new Error(
 				`Failed to Install or Load extension ${extension}: ${error instanceof Error ? error.message : String(error)}`
 			);
+		}
+	}
+
+	/* Check if specific extension is available */
+	async hasExtension(extensionName: string): Promise<boolean> {
+		if (!this.client) return false;
+
+		try {
+			const result = await this.client.query(
+				`
+					SELECT extension_name 
+					FROM duckdb_extensions() 
+					WHERE extension_name = ? AND loaded = true
+				`,
+				[extensionName]
+			);
+
+			return result.length > 0;
+		} catch (error) {
+			return false;
 		}
 	}
 }

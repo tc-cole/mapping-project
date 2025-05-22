@@ -2,10 +2,6 @@
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
 	import { clickedGeoJSON, openDrawer } from '$lib/components/io/stores';
 	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
-	import { MaskExtension } from '@deck.gl/extensions';
-
-	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { layers } from '$lib/components/io/stores';
 
 	// Define props with correct typing
 
@@ -73,7 +69,6 @@
 
 		if (e.mode === 'simple_select') {
 			isDrawing = false;
-			console.log(e);
 		}
 	}
 
@@ -140,45 +135,7 @@
 			return;
 		}
 
-		const maskLayerId = `mask-${Date.now()}`;
-
-		// Create and add the mask layer
-		const maskLayer = LayerFactory.create('geojson', {
-			id: maskLayerId,
-			props: {
-				operation: 'mask',
-				data: feature,
-				stroked: true,
-				filled: true,
-				visible: false,
-				lineWidthMinPixels: 2,
-				getLineColor: [255, 255, 255],
-				getFillColor: [0, 0, 0, 0]
-			}
-		});
-
-		layers.add(maskLayer);
-
-		// Get all existing layers
-		const layersSnapshot = [...layers.snapshot];
-
-		// Remove and recreate each layer with masks applied
-		layers.transaction(() => {
-			for (const layer of layersSnapshot) {
-				// Skip the mask layer itself and any layers you don't want to mask
-				if (layer.id === maskLayerId || layer.id.includes('basemap')) {
-					continue;
-				}
-
-				// Apply the mask extension
-				layers.updateProps(layer.id, {
-					extensions: [new MaskExtension()],
-					maskId: maskLayerId
-					// Optional: control how masking works
-					// maskByInstance: true or false depending on the layer type
-				});
-			}
-		});
+		clickedGeoJSON.set(feature);
 	}
 
 	function setDrawMode(mode: string) {
@@ -209,13 +166,6 @@
 
 <!-- Toolbar for quick access to editing tools - KEEPING ORIGINAL STYLING -->
 <div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">
-	<button
-		class="rounded bg-purple-600 p-2 text-white"
-		title="Test Mask in Manhattan"
-		onclick={createTestMask}
-	>
-		Test NYC Mask
-	</button>
 	<!-- Selection/Modify Tool -->
 	<button
 		class={`rounded p-2 ${activeEditTool === 'simple_select' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}

@@ -2,10 +2,11 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { chosenDataset, layers } from '$lib/components/io/stores';
+	import { chosenDataset, layers, clickedGeoJSON } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { flyTo } from './utils/flyto';
+	import type { Feature } from 'geojson';
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
@@ -22,6 +23,19 @@
 	let opacity = $state<number>(0.8);
 	let colorScale = $state<string>('viridis');
 	let showLabels = $state<boolean>(false);
+
+	let prevSizeColumn = $state<string | null>(null);
+	let prevColorColumn = $state<string | null>(null);
+	let prevLabelColumn = $state<string | null>(null);
+	let prevPointRadius = $state<number>(10);
+	let prevMinPointRadius = $state<number>(1);
+	let prevMaxPointRadius = $state<number>(100);
+	let prevOpacity = $state<number>(0.8);
+	let prevColorScale = $state<string>('viridis');
+	let prevShowLabels = $state<boolean>(false);
+
+	let currentFilter = $state<any>(null);
+	let isFiltered = $state<boolean>(false);
 
 	// Removed explicit state declaration as it's now handled by $derived
 
@@ -76,15 +90,26 @@
 		}
 	});
 
-	let prevSizeColumn = $state<string | null>(null);
-	let prevColorColumn = $state<string | null>(null);
-	let prevLabelColumn = $state<string | null>(null);
-	let prevPointRadius = $state<number>(10);
-	let prevMinPointRadius = $state<number>(1);
-	let prevMaxPointRadius = $state<number>(100);
-	let prevOpacity = $state<number>(0.8);
-	let prevColorScale = $state<string>('viridis');
-	let prevShowLabels = $state<boolean>(false);
+	$effect(() => {
+		if (!requiredColumnsSelected) return;
+		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
+			// New filter applied
+			currentFilter = $clickedGeoJSON;
+			isFiltered = true;
+
+			layers.updateProps(layer.id, {
+				data: loadDataFiltering(currentFilter)
+			});
+		} else if (!$clickedGeoJSON && isFiltered) {
+			// Filter cleared
+			currentFilter = null;
+			isFiltered = false;
+
+			layers.updateProps(layer.id, {
+				data: initalDataLoad()
+			});
+		}
+	});
 
 	// Update props when optional parameters change
 	$effect(() => {
@@ -284,7 +309,7 @@
 		try {
 			// Define the initial layer properties
 			const layerProps = {
-				data: loadData(),
+				data: initalDataLoad(),
 				getPosition: (d: Point) => {
 					if (!d || !d.position || d.position.length !== 2) {
 						return [0, 0]; // Default to prevent errors
@@ -304,7 +329,14 @@
 				radiusMaxPixels: 100,
 				opacity: opacity,
 				updateTriggers: {
-					getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
+					getRadius: [
+						pointRadius,
+						initalDataLoad,
+						sizeColumn,
+						minPointRadius,
+						maxPointRadius,
+						sizeRange
+					],
 					getFillColor: [colorColumn, colorScale, colorRange, opacity]
 				},
 				// Store the column selections as props to detect changes later
@@ -396,7 +428,7 @@
 				'colorColumn' in changedProps ||
 				'labelColumn' in changedProps
 			) {
-				updateObj.data = loadData();
+				updateObj.data = initalDataLoad();
 			}
 
 			layers.updateProps(layer.id, updateObj);
@@ -432,7 +464,36 @@
 		return [point.color, Math.floor(opacity * 255)];
 	}
 
-	async function* loadData() {
+	async function* loadDataFiltering(polygon: Feature) {
+		try {
+			yield [];
+
+			const db = SingletonDatabase.getInstance();
+			const client = await db.init();
+
+			if ($chosenDataset !== null) {
+				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
+
+				// Build column list for query
+				const columns = [latitudeColumn, longitudeColumn];
+				if (sizeColumn) columns.push(sizeColumn);
+				if (colorColumn) columns.push(colorColumn);
+				if (labelColumn) columns.push(labelColumn);
+
+				const columnsStr = columns.join(', ');
+				const query = `
+					SELECT ${columnsStr} FROM ${filename} 
+					WHERE ST_WITHIN(ST_POINT(${longitudeColumn}, ${latitudeColumn}), ST_GeomFromGeoJSON(?))
+				`;
+				const stream = await client.queryStream(query, [JSON.stringify(polygon.geometry)]);
+				yield* transformRows(stream.readRows());
+			}
+		} catch (error) {
+			console.error('foo', error);
+		}
+	}
+
+	async function* initalDataLoad() {
 		try {
 			// Initial empty dataset
 			yield [];
@@ -464,7 +525,10 @@
 						viewingPosition[longitudeColumn] !== undefined &&
 						viewingPosition[latitudeColumn] !== undefined
 					) {
-						flyTo(viewingPosition[longitudeColumn], viewingPosition[latitudeColumn]);
+						flyTo(
+							Number(viewingPosition[longitudeColumn]),
+							Number(viewingPosition[latitudeColumn])
+						);
 					}
 				}
 

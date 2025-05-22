@@ -5,13 +5,12 @@
 </script>
 
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
-	import mapboxgl from 'mapbox-gl';
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
+	import mapboxgl from 'mapbox-gl';
 
-	import { layers, editableGeoJSON } from '$lib/components/io/stores';
-	import { mapViewState } from '$lib/components/io/layer-management.svelte';
+	import { layers, editableGeoJSON, mapViewState } from '$lib/components/io/stores';
 	import { Deck, MapView } from '@deck.gl/core';
+	import { onDestroy, onMount } from 'svelte';
 
 	mapboxgl.accessToken =
 		'pk.eyJ1IjoiYXJwZXJ5YW4iLCJhIjoiY2l4cTJkc2t6MDAzcjJxcG9maWp1ZmFjMCJ9.XT957ywrTABjNFqGdp_37g';
