@@ -159,6 +159,7 @@
 
 	// In your layer management
 	// In your layer management
+	/*
 	function toggleMaskMode(layerId: string) {
 		// Find the layer
 		const layer = layers.snapshot.find((l) => l.id === layerId);
@@ -226,6 +227,7 @@
 			});
 		}
 	}
+	*/
 	// Enhanced GeoJSON transformer function
 	async function* transformRows(rows: AsyncIterable<any[]>) {
 		console.log('Starting GeoJSON transformRows with columns:', {
@@ -721,6 +723,7 @@
 </script>
 
 <Sectional label="GeoJSON">
+	<!--
 	<label class="flex items-center space-x-2">
 		<input
 			type="checkbox"
@@ -730,6 +733,7 @@
 		/>
 		<span class="text-sm text-gray-200">Filter other layers with this shape</span>
 	</label>
+	-->
 	<ColumnDropdown bind:chosenColumn={geojsonColumn} default_column="GeoJSON" />
 	{#if !requiredColumnsSelected}
 		<div class="mt-2 text-amber-500">Please select a GeoJSON column to display data.</div>

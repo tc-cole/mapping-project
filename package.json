@@ -45,7 +45,6 @@
 		"vitest": "^3.0.0"
 	},
 	"dependencies": {
-		"@deck.gl-community/editable-layers": "^9.0.3",
 		"@deck.gl/core": "^9.1.12",
 		"@deck.gl/extensions": "^9.1.12",
 		"@deck.gl/geo-layers": "^9.1.11",
@@ -56,9 +55,6 @@
 		"@mapbox/mapbox-gl-draw": "^1.5.0",
 		"@tailwindcss/postcss": "^4.1.4",
 		"@tailwindcss/vite": "^4.1.4",
-		"@turf/boolean-clockwise": "^7.2.0",
-		"@turf/helpers": "^7.2.0",
-		"@turf/turf": "^7.2.0",
 		"@types/d3": "^7.4.3",
 		"@types/mapbox-gl": "^3.4.1",
 		"@types/mapbox__mapbox-gl-draw": "^1.4.8",
@@ -67,7 +63,6 @@
 		"d3-scale": "^4.0.2",
 		"d3-time-format": "^4.1.0",
 		"deck.gl": "^9.1.11",
-		"echarts": "^5.6.0",
 		"file-selector": "^2.1.2",
 		"h3-js": "^4.2.1",
 		"idb-keyval": "^6.2.1",
