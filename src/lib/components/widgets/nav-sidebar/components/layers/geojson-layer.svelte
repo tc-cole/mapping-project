@@ -7,7 +7,6 @@
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Sectional from './utils/sectional.svelte';
-	import { MaskExtension } from '@deck.gl/extensions';
 
 	const CHUNK_SIZE = 100000;
 

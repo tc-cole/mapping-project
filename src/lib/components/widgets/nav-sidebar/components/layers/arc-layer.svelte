@@ -2,11 +2,16 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
 	import { layers } from '$lib/components/io/stores';
-
 	import { chosenDataset } from '$lib/components/io/stores';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
+	import ConfigField from './utils/config-field.svelte';
+	import { Slider } from '$lib/components/ui/slider/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.js';
+	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
+	import { AlertCircle } from '@lucide/svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
 
 	// Source coordinates
 	let fromLatitude = $state<string | undefined>();
@@ -30,6 +35,15 @@
 	let arcHeight = $state<number>(1);
 	let arcHeightMultiplier = $state<number>(1);
 
+	// Geospatial filtering
+	let filterEnabled = $state<boolean>(false);
+	let filterMode = $state<'distance' | 'bounds'>('distance');
+	let maxDistance = $state<number>(1000);
+	let boundsNorth = $state<number>(90);
+	let boundsSouth = $state<number>(-90);
+	let boundsEast = $state<number>(180);
+	let boundsWest = $state<number>(-180);
+
 	// Previous values for detecting changes
 	let prevWidthColumn = $state<string | null>(null);
 	let prevColorColumn = $state<string | null>(null);
@@ -42,6 +56,13 @@
 	let prevShowLabels = $state<boolean>(false);
 	let prevArcHeight = $state<number>(1);
 	let prevArcHeightMultiplier = $state<number>(1);
+	let prevFilterEnabled = $state<boolean>(false);
+	let prevFilterMode = $state<'distance' | 'bounds'>('distance');
+	let prevMaxDistance = $state<number>(1000);
+	let prevBoundsNorth = $state<number>(90);
+	let prevBoundsSouth = $state<number>(-90);
+	let prevBoundsEast = $state<number>(180);
+	let prevBoundsWest = $state<number>(-180);
 
 	// Available color scales
 	const colorScales = [
@@ -100,12 +121,10 @@
 
 	// Update props when optional parameters change
 	$effect(() => {
-		// Only run after initial layer creation
 		if (!hasInitialized || !requiredColumnsSelected) {
 			return;
 		}
 
-		// Detect which properties have changed
 		const changedProps: Record<string, any> = {};
 
 		if (widthColumn !== prevWidthColumn) {
@@ -163,11 +182,70 @@
 			prevArcHeightMultiplier = arcHeightMultiplier;
 		}
 
-		// Only update if something changed
+		if (filterEnabled !== prevFilterEnabled) {
+			changedProps.filterEnabled = filterEnabled;
+			prevFilterEnabled = filterEnabled;
+		}
+
+		if (filterMode !== prevFilterMode) {
+			changedProps.filterMode = filterMode;
+			prevFilterMode = filterMode;
+		}
+
+		if (maxDistance !== prevMaxDistance) {
+			changedProps.maxDistance = maxDistance;
+			prevMaxDistance = maxDistance;
+		}
+
+		if (
+			boundsNorth !== prevBoundsNorth ||
+			boundsSouth !== prevBoundsSouth ||
+			boundsEast !== prevBoundsEast ||
+			boundsWest !== prevBoundsWest
+		) {
+			changedProps.boundsNorth = boundsNorth;
+			changedProps.boundsSouth = boundsSouth;
+			changedProps.boundsEast = boundsEast;
+			changedProps.boundsWest = boundsWest;
+			prevBoundsNorth = boundsNorth;
+			prevBoundsSouth = boundsSouth;
+			prevBoundsEast = boundsEast;
+			prevBoundsWest = boundsWest;
+		}
+
 		if (Object.keys(changedProps).length > 0) {
 			updateOptionalProps(changedProps);
 		}
 	});
+
+	// Calculate distance between two points (haversine formula)
+	function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+		const R = 6371; // Earth's radius in km
+		const dLat = ((lat2 - lat1) * Math.PI) / 180;
+		const dLon = ((lon2 - lon1) * Math.PI) / 180;
+		const a =
+			Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+			Math.cos((lat1 * Math.PI) / 180) *
+				Math.cos((lat2 * Math.PI) / 180) *
+				Math.sin(dLon / 2) *
+				Math.sin(dLon / 2);
+		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		return R * c;
+	}
+
+	// Check if arc is within bounds
+	function isWithinBounds(fromLat: number, fromLon: number, toLat: number, toLon: number): boolean {
+		return (
+			fromLat >= boundsSouth &&
+			fromLat <= boundsNorth &&
+			fromLon >= boundsWest &&
+			fromLon <= boundsEast &&
+			toLat >= boundsSouth &&
+			toLat <= boundsNorth &&
+			toLon >= boundsWest &&
+			toLon <= boundsEast
+		);
+	}
 
 	async function* transformRows(rows: AsyncIterable<any[]>): AsyncGenerator<any[], void, unknown> {
 		console.log('==================== ARC TRANSFORM START ====================');
@@ -187,74 +265,60 @@
 		let batchCount = 0;
 		let totalRowsProcessed = 0;
 		let totalValidArcs = 0;
-		let invalidSourceCoordinates = 0;
-		let invalidTargetCoordinates = 0;
-		let nullCoordinates = 0;
+		let filteredOutCount = 0;
 
 		try {
 			yield [];
 
 			for await (const batch of rows) {
 				batchCount++;
-
 				totalRowsProcessed += batch.length;
-
-				if (batch.length > 0) {
-					console.log('First row in batch (raw):', JSON.stringify(batch[0], null, 2));
-				}
 
 				const validArcsBatch = [];
 
 				for (const row of batch) {
-					if (!row) {
-						continue;
-					}
+					if (!row) continue;
 
-					// Check for null/undefined source coordinates
+					// Check for null/undefined coordinates
 					if (
-						row[fromLatitude!] === null ||
-						row[fromLatitude!] === undefined ||
-						row[fromLongitude!] === null ||
-						row[fromLongitude!] === undefined
+						row[fromLatitude!] == null ||
+						row[fromLongitude!] == null ||
+						row[toLatitude!] == null ||
+						row[toLongitude!] == null
 					) {
-						nullCoordinates++;
 						continue;
 					}
 
-					// Check for null/undefined target coordinates
-					if (
-						row[toLatitude!] === null ||
-						row[toLatitude!] === undefined ||
-						row[toLongitude!] === null ||
-						row[toLongitude!] === undefined
-					) {
-						nullCoordinates++;
-						continue;
-					}
-
-					// Convert source coordinates to numbers explicitly
+					// Convert coordinates to numbers
 					const fromLong = Number(row[fromLongitude!]);
 					const fromLat = Number(row[fromLatitude!]);
-
-					// Skip if source coordinates couldn't be converted to valid numbers
-					if (isNaN(fromLong) || isNaN(fromLat)) {
-						invalidSourceCoordinates++;
-						continue;
-					}
-
-					// Convert target coordinates to numbers explicitly
 					const toLong = Number(row[toLongitude!]);
 					const toLat = Number(row[toLatitude!]);
 
-					// Skip if target coordinates couldn't be converted to valid numbers
-					if (isNaN(toLong) || isNaN(toLat)) {
-						invalidTargetCoordinates++;
+					// Skip invalid coordinates
+					if (isNaN(fromLong) || isNaN(fromLat) || isNaN(toLong) || isNaN(toLat)) {
 						continue;
 					}
 
-					// Get the width value (with default)
+					// Apply geospatial filtering
+					if (filterEnabled) {
+						if (filterMode === 'distance') {
+							const distance = calculateDistance(fromLat, fromLong, toLat, toLong);
+							if (distance > maxDistance) {
+								filteredOutCount++;
+								continue;
+							}
+						} else if (filterMode === 'bounds') {
+							if (!isWithinBounds(fromLat, fromLong, toLat, toLong)) {
+								filteredOutCount++;
+								continue;
+							}
+						}
+					}
+
+					// Get width value
 					let widthValue = 1;
-					if (widthColumn && row[widthColumn] !== null && row[widthColumn] !== undefined) {
+					if (widthColumn && row[widthColumn] != null) {
 						widthValue = Number(row[widthColumn]);
 						if (!isNaN(widthValue)) {
 							widthValues.push(widthValue);
@@ -263,9 +327,9 @@
 						}
 					}
 
-					// Get the color value
+					// Get color value
 					let colorValue = null;
-					if (colorColumn && row[colorColumn] !== null && row[colorColumn] !== undefined) {
+					if (colorColumn && row[colorColumn] != null) {
 						colorValue = Number(row[colorColumn]);
 						if (!isNaN(colorValue)) {
 							colorValues.push(colorValue);
@@ -274,13 +338,11 @@
 						}
 					}
 
-					// Get the label value
+					// Get label value
 					const labelValue =
-						labelColumn && row[labelColumn] !== null && row[labelColumn] !== undefined
-							? String(row[labelColumn])
-							: null;
+						labelColumn && row[labelColumn] != null ? String(row[labelColumn]) : null;
 
-					// Create arc with properly formatted values
+					// Create arc
 					const arc = {
 						sourcePosition: [fromLong, fromLat],
 						targetPosition: [toLong, toLat],
@@ -293,41 +355,30 @@
 				}
 
 				totalValidArcs += validArcsBatch.length;
-
-				// Add valid arcs to our accumulated collection
 				allArcs = [...allArcs, ...validArcsBatch];
 
 				if (batchCount === 1 && validArcsBatch.length > 0) {
 					if (widthValues.length > 0) {
-						const min = Math.min(...widthValues);
-						const max = Math.max(...widthValues);
-						widthRange = [min, max];
+						widthRange = [Math.min(...widthValues), Math.max(...widthValues)];
 					}
-
-					// Calculate color range if we have color values
 					if (colorValues.length > 0) {
-						const min = Math.min(...colorValues);
-						const max = Math.max(...colorValues);
-						colorRange = [min, max];
+						colorRange = [Math.min(...colorValues), Math.max(...colorValues)];
 					}
 				}
 
 				yield allArcs;
 			}
 
-			// Final yield if we didn't yield any arcs yet
+			console.log(`Filtered out ${filteredOutCount} arcs`);
+
 			if (allArcs.length === 0) {
 				yield [];
 			}
 		} catch (error: any) {
 			console.error('ERROR in arc transformRows:', error);
-			console.error('Error stack:', error.stack);
-			// In case of error, yield any arcs we've collected so far
 			if (allArcs.length > 0) {
-				console.log(`Error occurred, but yielding ${allArcs.length} collected arcs`);
 				yield allArcs;
 			} else {
-				console.log('Error occurred and no valid arcs collected, yielding empty array');
 				yield [];
 			}
 		}
@@ -335,65 +386,36 @@
 
 	// Dynamic arc width calculation
 	function getArcWidth(arc: any): number {
-		// If no width column specified or arc has no width, use fixed width
-		if (!widthColumn || arc.width === null || arc.width === undefined || isNaN(arc.width)) {
+		if (!widthColumn || arc.width == null || isNaN(arc.width)) {
 			return arcWidth;
 		}
 
-		// Calculate normalized width based on the data range
-		const widthMin = widthRange[0];
-		const widthMax = widthRange[1];
+		const [widthMin, widthMax] = widthRange;
+		if (widthMin === widthMax) return arcWidth;
 
-		// Handle edge case where min and max are the same
-		if (widthMin === widthMax) {
-			return arcWidth;
-		}
-
-		// Normalize the width value to 0-1 range
 		const normalizedWidth = (arc.width - widthMin) / (widthMax - widthMin);
-
-		// Map the normalized value to the width range
 		return minArcWidth + normalizedWidth * (maxArcWidth - minArcWidth);
 	}
 
-	// Dynamic color calculation based on color values
+	// Dynamic color calculation
 	function getArcColor(arc: any): number[] {
-		// Default color if no color column or value
-		if (!colorColumn || arc.color === null || arc.color === undefined || isNaN(arc.color)) {
-			return [0, 128, 255, Math.floor(opacity * 255)]; // Default blue
-		}
-
-		// Get color based on colorScale
-		const colorMin = colorRange[0];
-		const colorMax = colorRange[1];
-
-		// Handle case where all values are the same
-		if (colorMin === colorMax) {
+		if (!colorColumn || arc.color == null || isNaN(arc.color)) {
 			return [0, 128, 255, Math.floor(opacity * 255)];
 		}
 
-		// Normalize value to 0-1 range
-		const normalizedValue = (arc.color - colorMin) / (colorMax - colorMin);
+		const [colorMin, colorMax] = colorRange;
+		if (colorMin === colorMax) return [0, 128, 255, Math.floor(opacity * 255)];
 
-		// Color mapping based on the selected color scale
+		const normalizedValue = (arc.color - colorMin) / (colorMax - colorMin);
 		let r, g, b;
 
 		switch (colorScale) {
 			case 'viridis':
-				// Simple approximation of viridis
 				r = Math.floor((1 - normalizedValue) * 68);
 				g = Math.floor(
 					normalizedValue < 0.5 ? 85 + normalizedValue * 170 : 255 - (normalizedValue - 0.5) * 170
 				);
 				b = Math.floor(normalizedValue * 150 + 100);
-				break;
-			case 'plasma':
-				// Simple approximation of plasma
-				r = Math.floor(normalizedValue * 200 + 50);
-				g = Math.floor(
-					normalizedValue < 0.5 ? normalizedValue * 170 : 85 - (normalizedValue - 0.5) * 170
-				);
-				b = Math.floor((1 - normalizedValue) * 150 + 100);
 				break;
 			case 'blues':
 				r = Math.floor(50 + (1 - normalizedValue) * 150);
@@ -406,7 +428,6 @@
 				b = Math.floor(50 + (1 - normalizedValue) * 150);
 				break;
 			default:
-				// Default blue to red gradient
 				r = Math.floor(normalizedValue * 255);
 				g = 64;
 				b = Math.floor((1 - normalizedValue) * 255);
@@ -418,7 +439,6 @@
 	// Load data with async generator
 	async function* loadData(): AsyncGenerator<any[], void, unknown> {
 		try {
-			// Initial empty dataset
 			yield [];
 
 			const db = SingletonDatabase.getInstance();
@@ -427,7 +447,6 @@
 			if ($chosenDataset !== null) {
 				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
 
-				// Build column list for query
 				const columns = [fromLatitude, fromLongitude, toLatitude, toLongitude];
 				if (widthColumn) columns.push(widthColumn);
 				if (colorColumn) columns.push(colorColumn);
@@ -445,31 +464,26 @@
 			} else {
 				yield [];
 			}
-			console.log('==================== ARC LOAD DATA END ====================');
 		} catch (error: any) {
 			console.error('Error in arc loadData:', error);
-			// Return empty array in case of error
 			yield [];
 		}
 	}
 
-	// Create a new arc layer with all properties
+	// Create arc layer
 	function createArcLayer(): void {
 		try {
-			// Define the initial layer properties
 			const layerProps = {
 				data: loadData(),
 				getSourcePosition: (d: any) => {
 					if (!d || !d.sourcePosition || d.sourcePosition.length !== 2) {
-						console.warn('Invalid arc source position:', d);
-						return [0, 0]; // Default to prevent errors
+						return [0, 0];
 					}
 					return d.sourcePosition;
 				},
 				getTargetPosition: (d: any) => {
 					if (!d || !d.targetPosition || d.targetPosition.length !== 2) {
-						console.warn('Invalid arc target position:', d);
-						return [0, 0]; // Default to prevent errors
+						return [0, 0];
 					}
 					return d.targetPosition;
 				},
@@ -484,18 +498,13 @@
 				pickable: true,
 				autoHighlight: true,
 				getHeight: (d: any) => {
-					// Validate inputs
-					if (!d || !d.sourcePosition || !d.targetPosition) {
-						return 0;
-					}
+					if (!d || !d.sourcePosition || !d.targetPosition) return 0;
 
-					// Calculate distance in degrees as a simple proxy for arc height
 					const sourceLng = d.sourcePosition[0];
 					const sourceLat = d.sourcePosition[1];
 					const targetLng = d.targetPosition[0];
 					const targetLat = d.targetPosition[1];
 
-					// Simple Euclidean distance as a baseline
 					const distance = Math.sqrt(
 						Math.pow(targetLng - sourceLng, 2) + Math.pow(targetLat - sourceLat, 2)
 					);
@@ -507,7 +516,6 @@
 					getColor: [colorColumn, colorScale, colorRange, opacity],
 					getHeight: [arcHeight, arcHeightMultiplier]
 				},
-				// Store the column selections as props to detect changes later
 				fromLatColumn: fromLatitude,
 				fromLngColumn: fromLongitude,
 				toLatColumn: toLatitude,
@@ -517,10 +525,8 @@
 				labelColumn: labelColumn
 			};
 
-			// First check if a layer with this ID already exists (cleanup)
 			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
 			if (existingLayer) {
-				console.log(`Removing existing layer with ID: ${layer.id}`);
 				layers.remove(layer.id);
 			}
 
@@ -531,25 +537,18 @@
 
 			layers.add(newArcLayer);
 		} catch (error) {
-			//@ts-expect-error
-			console.error('Error creating arc layer:', error, error.stack);
+			console.error('Error creating arc layer:', error);
 		}
 	}
 
-	// Update layer props when optional parameters change
+	// Update layer props
 	function updateOptionalProps(changedProps: Record<string, any>): void {
 		try {
-			// Find the current layer
 			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
-			if (!currentLayer) {
-				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
-				return;
-			}
+			if (!currentLayer) return;
 
-			// Base update object with updateTriggers
 			const updateObj: Record<string, any> = { updateTriggers: {} };
 
-			// Handle width changes
 			if (
 				'arcWidth' in changedProps ||
 				'minArcWidth' in changedProps ||
@@ -563,7 +562,6 @@
 				};
 			}
 
-			// Handle color changes
 			if (
 				'colorColumn' in changedProps ||
 				'colorScale' in changedProps ||
@@ -576,7 +574,6 @@
 				};
 			}
 
-			// Handle height changes
 			if ('arcHeight' in changedProps || 'arcHeightMultiplier' in changedProps) {
 				updateObj.updateTriggers = {
 					...updateObj.updateTriggers,
@@ -584,141 +581,286 @@
 				};
 			}
 
-			// Direct opacity setting
 			if ('opacity' in changedProps) {
 				updateObj.opacity = opacity;
 			}
 
-			// Update column references
-			if ('widthColumn' in changedProps) {
-				updateObj.widthColumn = widthColumn;
-			}
+			if ('widthColumn' in changedProps) updateObj.widthColumn = widthColumn;
+			if ('colorColumn' in changedProps) updateObj.colorColumn = colorColumn;
+			if ('labelColumn' in changedProps) updateObj.labelColumn = labelColumn;
 
-			if ('colorColumn' in changedProps) {
-				updateObj.colorColumn = colorColumn;
-			}
-
-			if ('labelColumn' in changedProps) {
-				updateObj.labelColumn = labelColumn;
-			}
-
-			// If any data-related property changed, reload the data
 			if (
 				'widthColumn' in changedProps ||
 				'colorColumn' in changedProps ||
-				'labelColumn' in changedProps
+				'labelColumn' in changedProps ||
+				'filterEnabled' in changedProps ||
+				'filterMode' in changedProps ||
+				'maxDistance' in changedProps ||
+				'boundsNorth' in changedProps ||
+				'boundsSouth' in changedProps ||
+				'boundsEast' in changedProps ||
+				'boundsWest' in changedProps
 			) {
 				updateObj.data = loadData();
 			}
 
-			// Apply the updates
 			layers.updateProps(layer.id, updateObj);
-			console.log('Updated layer properties:', Object.keys(changedProps).join(', '));
 		} catch (error) {
 			console.error('Error updating arc layer props:', error);
 		}
 	}
 </script>
 
-<Sectional label="Required Coordinates">
-	<ColumnDropdown bind:chosenColumn={fromLatitude} default_column="Starting Latitude" />
-	<ColumnDropdown bind:chosenColumn={fromLongitude} default_column="Starting Longitude" />
-	<ColumnDropdown bind:chosenColumn={toLatitude} default_column="Destination Latitude" />
-	<ColumnDropdown bind:chosenColumn={toLongitude} default_column="Destination Longitude" />
-</Sectional>
-
-<Sectional label="Optional Columns">
-	<ColumnDropdown bind:chosenColumn={widthColumn} default_column="Width" />
-	<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" />
-	<ColumnDropdown bind:chosenColumn={labelColumn} default_column="Label" />
-</Sectional>
-
-<Sectional label="Color Settings">
-	{#if colorColumn}
-		<select
-			class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-			bind:value={colorScale}
-		>
-			{#each colorScales as scale}
-				<option value={scale}>{scale}</option>
-			{/each}
-		</select>
+<div class="space-y-1">
+	{#if !requiredColumnsSelected}
+		<Alert class="mx-2 mb-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+			<AlertCircle class="h-3 w-3" />
+			<AlertDescription class="text-xs">
+				Select all coordinate columns to display arcs
+			</AlertDescription>
+		</Alert>
 	{/if}
-</Sectional>
 
-<Sectional label="Arc Style">
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<input type="range" min="1" max="10" step="0.5" bind:value={arcWidth} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Thin</span>
-				<span>Thick</span>
-			</div>
-		</div>
-		<div>
-			<input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Transparent</span>
-				<span>Solid</span>
-			</div>
-		</div>
-	</div>
-</Sectional>
-
-<Sectional label="Arc Height">
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<input type="range" min="0" max="5" step="0.1" bind:value={arcHeight} class="w-full" />
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Flat</span>
-				<span>Curved</span>
-			</div>
-		</div>
-		<div>
-			<input
-				type="range"
-				min="0.1"
-				max="5"
-				step="0.1"
-				bind:value={arcHeightMultiplier}
-				class="w-full"
+	<Sectional label="Source Coordinates" defaultOpen={true}>
+		<ConfigField label="Latitude">
+			<ColumnDropdown
+				bind:chosenColumn={fromLatitude}
+				default_column="From Latitude"
+				placeholder="Select latitude column"
 			/>
-			<div class="flex justify-between text-xs text-gray-500">
-				<span>Low</span>
-				<span>High</span>
-			</div>
-		</div>
-	</div>
-</Sectional>
+		</ConfigField>
 
-<Sectional label="Width Range">
-	{#if widthColumn}
-		<div class="grid grid-cols-2 gap-4">
-			<div>
-				<input type="range" min="0.5" max="5" step="0.5" bind:value={minArcWidth} class="w-full" />
-			</div>
-			<div>
-				<input type="range" min="5" max="50" step="1" bind:value={maxArcWidth} class="w-full" />
-			</div>
-		</div>
-	{/if}
-</Sectional>
-
-<Sectional label="Label Settings">
-	{#if labelColumn}
-		<div class="flex items-center">
-			<input
-				type="checkbox"
-				bind:checked={showLabels}
-				class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+		<ConfigField label="Longitude">
+			<ColumnDropdown
+				bind:chosenColumn={fromLongitude}
+				default_column="From Longitude"
+				placeholder="Select longitude column"
 			/>
-			<span class="ml-2 text-sm text-gray-700">Show Labels</span>
-		</div>
-	{/if}
-</Sectional>
+		</ConfigField>
+	</Sectional>
 
-{#if !requiredColumnsSelected}
-	<div class="mt-2 text-amber-500">
-		Please select source and destination coordinates to display arcs.
-	</div>
-{/if}
+	<Sectional label="Target Coordinates" defaultOpen={true}>
+		<ConfigField label="Latitude">
+			<ColumnDropdown
+				bind:chosenColumn={toLatitude}
+				default_column="To Latitude"
+				placeholder="Select latitude column"
+			/>
+		</ConfigField>
+
+		<ConfigField label="Longitude">
+			<ColumnDropdown
+				bind:chosenColumn={toLongitude}
+				default_column="To Longitude"
+				placeholder="Select longitude column"
+			/>
+		</ConfigField>
+	</Sectional>
+
+	<Sectional label="Visual Properties" defaultOpen={false}>
+		<ConfigField label="Arc Width" value="{arcWidth}px">
+			<Slider
+				type="single"
+				value={arcWidth}
+				min={1}
+				max={10}
+				step={0.5}
+				onValueChange={(v: number) => (arcWidth = v)}
+				class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+			/>
+		</ConfigField>
+
+		<ConfigField label="Opacity" value="{Math.round(opacity * 100)}%">
+			<Slider
+				type="single"
+				value={opacity}
+				min={0.1}
+				max={1}
+				step={0.05}
+				onValueChange={(v: number) => (opacity = v)}
+				class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+			/>
+		</ConfigField>
+
+		<ConfigField label="Arc Height" value={arcHeight.toFixed(1)}>
+			<Slider
+				type="single"
+				value={arcHeight}
+				min={0}
+				max={5}
+				step={0.1}
+				onValueChange={(v: number) => (arcHeight = v)}
+				class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+			/>
+		</ConfigField>
+
+		<ConfigField label="Height Multiplier" value="{arcHeightMultiplier.toFixed(1)}x">
+			<Slider
+				type="single"
+				value={arcHeightMultiplier}
+				min={0.1}
+				max={5}
+				step={0.1}
+				onValueChange={(v: number) => (arcHeightMultiplier = v)}
+				class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+			/>
+		</ConfigField>
+	</Sectional>
+
+	<Sectional label="Data Encoding" defaultOpen={false}>
+		<ConfigField label="Width Column">
+			<ColumnDropdown
+				bind:chosenColumn={widthColumn}
+				default_column="Width"
+				placeholder="Fixed width"
+			/>
+		</ConfigField>
+
+		{#if widthColumn}
+			<div class="space-y-3 border-l-2 border-border/30 pl-4">
+				<ConfigField label="Min Width" value="{minArcWidth}px">
+					<Slider
+						type="single"
+						value={minArcWidth}
+						min={0.5}
+						max={5}
+						step={0.5}
+						onValueChange={(v: number) => (minArcWidth = v)}
+						class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+					/>
+				</ConfigField>
+
+				<ConfigField label="Max Width" value="{maxArcWidth}px">
+					<Slider
+						type="single"
+						value={maxArcWidth}
+						min={5}
+						max={50}
+						step={1}
+						onValueChange={(v: number) => (maxArcWidth = v)}
+						class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+					/>
+				</ConfigField>
+			</div>
+		{/if}
+
+		<ConfigField label="Color Column">
+			<ColumnDropdown
+				bind:chosenColumn={colorColumn}
+				default_column="Color"
+				placeholder="Fixed color"
+			/>
+		</ConfigField>
+
+		{#if colorColumn}
+			<ConfigField label="Color Scale" class="border-l-2 border-border/30 pl-4">
+				<select
+					class="flex h-7 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+					bind:value={colorScale}
+				>
+					{#each colorScales as scale}
+						<option value={scale} class="capitalize">{scale}</option>
+					{/each}
+				</select>
+			</ConfigField>
+		{/if}
+
+		<ConfigField label="Label Column">
+			<ColumnDropdown
+				bind:chosenColumn={labelColumn}
+				default_column="Label"
+				placeholder="No labels"
+			/>
+		</ConfigField>
+
+		{#if labelColumn}
+			<div class="flex items-center space-x-2 border-l-2 border-border/30 py-2 pl-4">
+				<Switch id="show-labels" bind:checked={showLabels} class="h-4 w-6" />
+				<label for="show-labels" class="cursor-pointer text-xs font-normal text-muted-foreground">
+					Display labels on map
+				</label>
+			</div>
+		{/if}
+	</Sectional>
+
+	<Sectional label="Geospatial Filter" defaultOpen={false}>
+		<div class="flex items-center space-x-2">
+			<Switch id="filter-enabled" bind:checked={filterEnabled} class="h-4 w-6" />
+			<label for="filter-enabled" class="cursor-pointer text-xs font-normal text-muted-foreground">
+				Enable filtering
+			</label>
+		</div>
+
+		{#if filterEnabled}
+			<div class="space-y-3 border-l-2 border-border/30 pl-4">
+				<ConfigField label="Filter Mode">
+					<select
+						class="flex h-7 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+						bind:value={filterMode}
+					>
+						<option value="distance">By Distance</option>
+						<option value="bounds">By Bounds</option>
+					</select>
+				</ConfigField>
+
+				{#if filterMode === 'distance'}
+					<ConfigField label="Max Distance" value="{maxDistance} km">
+						<Slider
+							type="single"
+							value={maxDistance}
+							min={1}
+							max={5000}
+							step={10}
+							onValueChange={(v: number) => (maxDistance = v)}
+							class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+						/>
+					</ConfigField>
+				{:else if filterMode === 'bounds'}
+					<ConfigField label="North Bound">
+						<Input
+							type="number"
+							bind:value={boundsNorth}
+							min={-90}
+							max={90}
+							step={1}
+							class="h-7 text-xs"
+						/>
+					</ConfigField>
+
+					<ConfigField label="South Bound">
+						<Input
+							type="number"
+							bind:value={boundsSouth}
+							min={-90}
+							max={90}
+							step={1}
+							class="h-7 text-xs"
+						/>
+					</ConfigField>
+
+					<ConfigField label="East Bound">
+						<Input
+							type="number"
+							bind:value={boundsEast}
+							min={-180}
+							max={180}
+							step={1}
+							class="h-7 text-xs"
+						/>
+					</ConfigField>
+
+					<ConfigField label="West Bound">
+						<Input
+							type="number"
+							bind:value={boundsWest}
+							min={-180}
+							max={180}
+							step={1}
+							class="h-7 text-xs"
+						/>
+					</ConfigField>
+				{/if}
+			</div>
+		{/if}
+	</Sectional>
+</div>

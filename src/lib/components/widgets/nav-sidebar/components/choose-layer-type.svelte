@@ -10,6 +10,7 @@
 	import LayerConfiguration from './layer-configuration.svelte';
 	import { ChevronRight } from '@lucide/svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
+	import { cn } from '$lib/utils';
 
 	let { layer }: { layer: DeckLayerEntry } = $props();
 	let selectedLabel = $state('Choose Type');
@@ -27,40 +28,44 @@
 	}
 </script>
 
-<SidebarMenuSubItem>
-	<Collapsible.Root class="group/collapsible" open={true}>
-		<Collapsible.Trigger>
-			{#snippet child({ props })}
-				<SidebarMenuSubButton {...props} class={buttonVariants({ variant: 'secondary' })}>
-					Configure Layer
-					<ChevronRight
-						class="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90"
-					/>
-				</SidebarMenuSubButton>
-			{/snippet}
-		</Collapsible.Trigger>
-		<Collapsible.Content class="my-3">
-			<DropdownMenu.Root>
-				<SidebarMenuSubButton>
-					{#snippet child({ props })}
-						<DropdownMenu.Trigger {...props} class={buttonVariants({ variant: 'secondary' })}>
-							{selectedLabel}
-						</DropdownMenu.Trigger>
-					{/snippet}
-				</SidebarMenuSubButton>
-				<DropdownMenu.Content class="w-40">
-					<DropdownMenu.Group>
-						{#each Object.entries(layerDefs) as [key, def]}
-							<DropdownMenu.Item onclick={(_) => chooseType(key)}>
-								{def.label}
-							</DropdownMenu.Item>
-						{/each}
-					</DropdownMenu.Group>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-			<div class="my-3">
-				<LayerConfiguration layertype={selectedLabel} {layer} />
-			</div>
-		</Collapsible.Content>
-	</Collapsible.Root>
-</SidebarMenuSubItem>
+<Collapsible.Root class="group/collapsible" open={true}>
+	<Collapsible.Trigger class="w-full">
+		{#snippet child({ props })}
+			<SidebarMenuSubButton
+				{...props}
+				class={cn(buttonVariants({ variant: 'secondary' }), 'w-full justify-between')}
+			>
+				Configure Layer
+				<ChevronRight
+					class="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90"
+				/>
+			</SidebarMenuSubButton>
+		{/snippet}
+	</Collapsible.Trigger>
+	<Collapsible.Content class="my-3">
+		<DropdownMenu.Root>
+			<SidebarMenuSubButton>
+				{#snippet child({ props })}
+					<DropdownMenu.Trigger
+						{...props}
+						class={cn(buttonVariants({ variant: 'secondary' }), 'w-full justify-between')}
+					>
+						{selectedLabel}
+					</DropdownMenu.Trigger>
+				{/snippet}
+			</SidebarMenuSubButton>
+			<DropdownMenu.Content class="w-40">
+				<DropdownMenu.Group>
+					{#each Object.entries(layerDefs) as [key, def]}
+						<DropdownMenu.Item onclick={(_) => chooseType(key)}>
+							{def.label}
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Group>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+		<div class="my-3">
+			<LayerConfiguration layertype={selectedLabel} {layer} />
+		</div>
+	</Collapsible.Content>
+</Collapsible.Root>
