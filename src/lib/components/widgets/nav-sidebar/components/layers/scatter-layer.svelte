@@ -2,14 +2,16 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { chosenDataset, layers, clickedGeoJSON } from '$lib/components/io/stores';
+	import { chosenDataset, layers } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { Slider } from '$lib/components/ui/slider/index.js';
+	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
+	import { AlertCircle } from '@lucide/svelte';
 	import { flyTo } from './utils/flyto';
-	import type { Feature } from 'geojson';
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
+	import ConfigField from './utils/config-field.svelte';
 
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
@@ -23,21 +25,6 @@
 	let opacity = $state<number>(0.8);
 	let colorScale = $state<string>('viridis');
 	let showLabels = $state<boolean>(false);
-
-	let prevSizeColumn = $state<string | null>(null);
-	let prevColorColumn = $state<string | null>(null);
-	let prevLabelColumn = $state<string | null>(null);
-	let prevPointRadius = $state<number>(10);
-	let prevMinPointRadius = $state<number>(1);
-	let prevMaxPointRadius = $state<number>(100);
-	let prevOpacity = $state<number>(0.8);
-	let prevColorScale = $state<string>('viridis');
-	let prevShowLabels = $state<boolean>(false);
-
-	let currentFilter = $state<any>(null);
-	let isFiltered = $state<boolean>(false);
-
-	// Removed explicit state declaration as it's now handled by $derived
 
 	// Available color scales
 	const colorScales = [
@@ -86,30 +73,20 @@
 			(currentLayer.props.latColumn !== latitudeColumn ||
 				currentLayer.props.lngColumn !== longitudeColumn)
 		) {
+			console.log('Latitude or longitude columns changed, recreating layer');
 			createScatterLayer();
 		}
 	});
 
-	$effect(() => {
-		if (!requiredColumnsSelected) return;
-		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
-			// New filter applied
-			currentFilter = $clickedGeoJSON;
-			isFiltered = true;
-
-			layers.updateProps(layer.id, {
-				data: loadDataFiltering(currentFilter)
-			});
-		} else if (!$clickedGeoJSON && isFiltered) {
-			// Filter cleared
-			currentFilter = null;
-			isFiltered = false;
-
-			layers.updateProps(layer.id, {
-				data: initalDataLoad()
-			});
-		}
-	});
+	let prevSizeColumn = $state<string | null>(null);
+	let prevColorColumn = $state<string | null>(null);
+	let prevLabelColumn = $state<string | null>(null);
+	let prevPointRadius = $state<number>(10);
+	let prevMinPointRadius = $state<number>(1);
+	let prevMaxPointRadius = $state<number>(100);
+	let prevOpacity = $state<number>(0.8);
+	let prevColorScale = $state<string>('viridis');
+	let prevShowLabels = $state<boolean>(false);
 
 	// Update props when optional parameters change
 	$effect(() => {
@@ -309,9 +286,10 @@
 		try {
 			// Define the initial layer properties
 			const layerProps = {
-				data: initalDataLoad(),
+				data: loadData(),
 				getPosition: (d: Point) => {
 					if (!d || !d.position || d.position.length !== 2) {
+						console.warn('Invalid scatter position:', d);
 						return [0, 0]; // Default to prevent errors
 					}
 					return d.position;
@@ -329,14 +307,7 @@
 				radiusMaxPixels: 100,
 				opacity: opacity,
 				updateTriggers: {
-					getRadius: [
-						pointRadius,
-						initalDataLoad,
-						sizeColumn,
-						minPointRadius,
-						maxPointRadius,
-						sizeRange
-					],
+					getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
 					getFillColor: [colorColumn, colorScale, colorRange, opacity]
 				},
 				// Store the column selections as props to detect changes later
@@ -350,10 +321,12 @@
 			// First check if a layer with this ID already exists (cleanup)
 			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
 			if (existingLayer) {
+				console.log(`Removing existing layer with ID: ${layer.id}`);
 				layers.remove(layer.id);
 			}
 
 			// Create a new scatter layer with the properties
+
 			const newScatterLayer = LayerFactory.create('scatter', {
 				id: layer.id,
 				props: layerProps
@@ -361,8 +334,10 @@
 
 			// Add the new scatter layer
 			layers.add(newScatterLayer);
+			console.log('==================== SCATTER LAYER CREATED ====================');
 		} catch (error) {
-			// Error handling without console.error
+			//@ts-expect-error
+			console.error('Error creating scatter layer:', error, error.stack);
 		}
 	}
 
@@ -372,6 +347,7 @@
 			// Find the current layer
 			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
 			if (!currentLayer) {
+				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
 				return;
 			}
 
@@ -428,14 +404,15 @@
 				'colorColumn' in changedProps ||
 				'labelColumn' in changedProps
 			) {
-				updateObj.data = initalDataLoad();
+				updateObj.data = loadData();
 			}
 
 			layers.updateProps(layer.id, updateObj);
 		} catch (error) {
-			// Error handling without console.error
+			//@ts-expect-error
+			console.error('Error updating scatter layer props:', error, error.stack);
 		}
-	}
+	} // Modify your updateMapLayers to use the new functions
 
 	function getPointRadius(point: any) {
 		if (!sizeColumn || point.size === null || point.size === undefined) {
@@ -452,7 +429,6 @@
 		const normalizedSize = (point.size - sizeMin) / (sizeMax - sizeMin);
 		return minPointRadius + normalizedSize * (maxPointRadius - minPointRadius);
 	}
-
 	// Dynamic color calculation
 	function getPointColor(point: any) {
 		if (!colorColumn || point.color === null) {
@@ -464,36 +440,7 @@
 		return [point.color, Math.floor(opacity * 255)];
 	}
 
-	async function* loadDataFiltering(polygon: Feature) {
-		try {
-			yield [];
-
-			const db = SingletonDatabase.getInstance();
-			const client = await db.init();
-
-			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
-
-				// Build column list for query
-				const columns = [latitudeColumn, longitudeColumn];
-				if (sizeColumn) columns.push(sizeColumn);
-				if (colorColumn) columns.push(colorColumn);
-				if (labelColumn) columns.push(labelColumn);
-
-				const columnsStr = columns.join(', ');
-				const query = `
-					SELECT ${columnsStr} FROM ${filename} 
-					WHERE ST_WITHIN(ST_POINT(${longitudeColumn}, ${latitudeColumn}), ST_GeomFromGeoJSON(?))
-				`;
-				const stream = await client.queryStream(query, [JSON.stringify(polygon.geometry)]);
-				yield* transformRows(stream.readRows());
-			}
-		} catch (error) {
-			console.error('foo', error);
-		}
-	}
-
-	async function* initalDataLoad() {
+	async function* loadData() {
 		try {
 			// Initial empty dataset
 			yield [];
@@ -536,121 +483,151 @@
 
 				yield* transformRows(stream.readRows());
 			} else {
+				console.log('No dataset chosen');
 				yield [];
 			}
 		} catch (error) {
-			// Error handling without console.error
+			console.error('Error loading data:', error);
+			// Return empty array in case of error
 			yield [];
 		}
 	}
 </script>
 
-<!-- Required Coordinates -->
-<div class="mb-4">
-	<Sectional label="Choose Latitude and Longitude Columns">
-		<div class="py-1">
-			<ColumnDropdown bind:chosenColumn={latitudeColumn} default_column={'Latitude'} />
-		</div>
-		<div class="py-1">
-			<ColumnDropdown bind:chosenColumn={longitudeColumn} default_column={'Longitude'} />
-		</div>
-		<div>
-			{#if !requiredColumnsSelected}
-				<p class="text-sm text-amber-500">Please select both columns to display points.</p>
-			{/if}
-		</div>
+<div class="space-y-1">
+	{#if !requiredColumnsSelected}
+		<Alert class="mx-2 mb-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+			<AlertCircle class="h-3 w-3" />
+			<AlertDescription class="text-xs">
+				Select latitude and longitude columns to display points.
+			</AlertDescription>
+		</Alert>
+	{/if}
+
+	<Sectional label="Coordinates" defaultOpen={true}>
+		<ConfigField label="Latitude">
+			<ColumnDropdown
+				bind:chosenColumn={latitudeColumn}
+				default_column="Latitude"
+				placeholder="Select latitude column"
+			/>
+		</ConfigField>
+
+		<ConfigField label="Longitude">
+			<ColumnDropdown
+				bind:chosenColumn={longitudeColumn}
+				default_column="Longitude"
+				placeholder="Select longitude column"
+			/>
+		</ConfigField>
 	</Sectional>
-</div>
 
-<!-- Optional Encodings -->
-<div class="mb-4">
-	<Sectional label="Optional Columns">
-		<div class="space-y-4">
-			<ColumnDropdown bind:chosenColumn={sizeColumn} default_column="Size" />
-			<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" />
+	<Sectional label="Style" defaultOpen={true}>
+		<ConfigField label="Point Size" value="{pointRadius}px">
+			<Slider
+				type="single"
+				value={pointRadius}
+				min={1}
+				max={50}
+				step={1}
+				onValueChange={(v: number) => (pointRadius = v)}
+				class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+			/>
+		</ConfigField>
 
-			{#if colorColumn}
-				<div class="mt-2 space-y-1">
-					<select
-						class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-						bind:value={colorScale}
-					>
-						{#each colorScales as scale}
-							<option value={scale}>{scale}</option>
-						{/each}
-					</select>
-				</div>
-			{/if}
-
-			{#if sizeColumn}
-				<div class="mt-2 space-y-2">
-					<div>
-						<Label>Min Radius</Label>
-						<Input
-							type="range"
-							min="1"
-							max="50"
-							step="1"
-							bind:value={minPointRadius}
-							class="w-full"
-						/>
-					</div>
-					<div>
-						<Label>Max Radius</Label>
-						<Input
-							type="range"
-							min="10"
-							max="200"
-							step="5"
-							bind:value={maxPointRadius}
-							class="w-full"
-						/>
-					</div>
-				</div>
-			{/if}
-		</div>
+		<ConfigField label="Opacity" value="{Math.round(opacity * 100)}%">
+			<Slider
+				type="single"
+				value={opacity}
+				min={0.1}
+				max={1}
+				step={0.05}
+				onValueChange={(v: number) => (opacity = v)}
+				class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+			/>
+		</ConfigField>
 	</Sectional>
-</div>
 
-<div class="mb-4">
-	<Sectional label="Visual Adjustments">
-		<div class="space-y-4">
-			<div>
-				<Input type="range" min="1" max="50" step="1" bind:value={pointRadius} class="w-full" />
-				<div class="flex justify-between text-xs text-gray-500">
-					<span>Small</span>
-					<span>Large</span>
-				</div>
-			</div>
-			<div>
-				<Input type="range" min="0.1" max="1" step="0.05" bind:value={opacity} class="w-full" />
-				<div class="flex justify-between text-xs text-gray-500">
-					<span>Transparent</span>
-					<span>Solid</span>
-				</div>
-			</div>
-		</div>
-	</Sectional>
-</div>
+	<Sectional label="Data Encoding" defaultOpen={false}>
+		<ConfigField label="Size Column">
+			<ColumnDropdown
+				bind:chosenColumn={sizeColumn}
+				default_column="Size"
+				placeholder="Fixed size"
+			/>
+		</ConfigField>
 
-<!-- Labels -->
-<div class="mb-4">
-	<Sectional label="Point Labels">
-		<div class="space-y-2">
-			<div class="grid grid-cols-2 items-center gap-4">
-				<div>
-					<ColumnDropdown bind:chosenColumn={labelColumn} default_column="Label" />
-				</div>
-				<div class="flex items-center">
-					<input
-						type="checkbox"
-						bind:checked={showLabels}
-						class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-						disabled={!labelColumn}
+		{#if sizeColumn}
+			<div class="space-y-3 border-l-2 border-border/30 pl-4">
+				<ConfigField label="Min Size" value="{minPointRadius}px">
+					<Slider
+						type="single"
+						value={minPointRadius}
+						min={1}
+						max={50}
+						step={1}
+						onValueChange={(v: number) => (minPointRadius = v)}
+						class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
 					/>
-					<span class="ml-2 text-sm text-gray-700">Show Labels</span>
-				</div>
+				</ConfigField>
+
+				<ConfigField label="Max Size" value="{maxPointRadius}px">
+					<Slider
+						type="single"
+						value={maxPointRadius}
+						min={10}
+						max={200}
+						step={5}
+						onValueChange={(v: number) => (maxPointRadius = v)}
+						class="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+					/>
+				</ConfigField>
 			</div>
-		</div>
+		{/if}
+
+		<ConfigField label="Color Column">
+			<ColumnDropdown
+				bind:chosenColumn={colorColumn}
+				default_column="Color"
+				placeholder="Fixed color"
+			/>
+		</ConfigField>
+
+		{#if colorColumn}
+			<ConfigField label="Color Scale" class="border-l-2 border-border/30 pl-4">
+				<select
+					class="flex h-7 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+					bind:value={colorScale}
+				>
+					{#each colorScales as scale}
+						<option value={scale} class="capitalize">{scale}</option>
+					{/each}
+				</select>
+			</ConfigField>
+		{/if}
+	</Sectional>
+
+	<Sectional label="Labels" defaultOpen={false}>
+		<ConfigField label="Label Column">
+			<ColumnDropdown
+				bind:chosenColumn={labelColumn}
+				default_column="Label"
+				placeholder="No labels"
+			/>
+		</ConfigField>
+
+		{#if labelColumn}
+			<div class="flex items-center space-x-2 border-l-2 border-border/30 py-2 pl-4">
+				<input
+					type="checkbox"
+					bind:checked={showLabels}
+					id="show-labels"
+					class="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary"
+				/>
+				<Label for="show-labels" class="cursor-pointer text-xs font-normal">
+					Display labels on map
+				</Label>
+			</div>
+		{/if}
 	</Sectional>
 </div>

@@ -4,12 +4,15 @@
 	import SidebarMenuSubButton from '$lib/components/ui/sidebar/sidebar-menu-sub-button.svelte';
 	// import SidebarMenuSubItem from '$lib/components/ui/sidebar/sidebar-menu-sub-item.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
+	import { cn } from '$lib/utils';
 </script>
 
 <DropdownMenu.Root>
 	<SidebarMenuSubButton>
 		{#snippet child({ props })}
-			<DropdownMenu.Trigger {...props} class={buttonVariants({ variant: 'secondary' })}
+			<DropdownMenu.Trigger
+				{...props}
+				class={cn(buttonVariants({ variant: 'secondary' }), 'w-full justify-between')}
 				>{$chosenDataset === null
 					? 'Choose Dataset'
 					: $chosenDataset.filename}</DropdownMenu.Trigger
