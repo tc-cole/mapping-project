@@ -5,18 +5,24 @@
 	import {
 		chosenDataset,
 		clickedGeoJSON,
-		layers,
-		geometryTableMap
+		selectedGeometryId,
+		layers
 	} from '$lib/components/io/stores';
+
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { AlertCircle } from '@lucide/svelte';
 	import { flyTo } from './utils/flyto';
+	import {
+		GeometryFilterManager,
+		getGeometryId
+	} from '$lib/components/io/geometry-management.svelte';
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 	import ConfigField from './utils/config-field.svelte';
+
 	//import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	let latitudeColumn = $state<string | undefined>();
@@ -63,18 +69,35 @@
 
 	$effect(() => {
 		if (!requiredColumnsSelected) return;
+
 		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
-			// New filter applied ✅
+			// New filter applied
 			currentFilter = $clickedGeoJSON;
 			isFiltered = true;
-			layers.updateProps(layer.id, {
-				data: loadDataFiltering($clickedGeoJSON)
+
+			const geometryId = getGeometryId($clickedGeoJSON);
+
+			// Set the selected geometry ID
+			selectedGeometryId.set(geometryId);
+
+			// Create or get existing filter table
+			createTempFilterTable($clickedGeoJSON).then((filterInfo) => {
+				if (filterInfo) {
+					console.log(`Geometry ${geometryId} mapped to table: ${filterInfo.tableName}`);
+
+					// Update layer with filtered data from the table
+					layers.updateProps(layer.id, {
+						data: loadDataFromTable(filterInfo.tableName)
+					});
+				}
 			});
-			createTempFilterTable($clickedGeoJSON);
 		} else if (!$clickedGeoJSON && isFiltered) {
-			// Filter cleared ✅
+			// Filter cleared
 			currentFilter = null;
 			isFiltered = false;
+			selectedGeometryId.set(null);
+
+			// Return to original data
 			layers.updateProps(layer.id, {
 				data: loadData()
 			});
@@ -176,6 +199,7 @@
 		}
 	});
 
+	// Updated createTempFilterTable function
 	async function createTempFilterTable(feature: any) {
 		if (!feature || !feature.geometry) {
 			console.error('Invalid feature for filtering');
@@ -186,11 +210,11 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			// First, load spatial extension
+			// Load spatial extension
 			try {
 				await db.hasExtension('spatial');
 			} catch (e) {
-				console.log('Spatial extension already loaded or error installing', e);
+				console.log('Spatial extension handling:', e);
 			}
 
 			if ($chosenDataset === null) {
@@ -198,63 +222,25 @@
 				return null;
 			}
 
-			// Generate a unique table name with alphanumeric characters only
-			const timestamp = Date.now();
-			const tempTableName = `filtered_${timestamp}`;
-
-			// Clean up any existing table with this name
-			try {
-				await client.query(`DROP TABLE IF EXISTS ${tempTableName}`);
-			} catch (e) {
-				// Ignore drop errors
-			}
-
-			// Get the source table name
 			const sourceTable = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
 
-			// Get column list (use the same columns as your scatter layer)
+			// Build columns array
+			if (!latitudeColumn || !longitudeColumn) return;
 			const columns = [latitudeColumn, longitudeColumn];
 			if (sizeColumn) columns.push(sizeColumn);
 			if (colorColumn) columns.push(colorColumn);
 			if (labelColumn) columns.push(labelColumn);
 
-			const columnsStr = columns.join(', ');
-
-			// Convert the GeoJSON to a string for the query
-			const geojsonString = JSON.stringify(feature.geometry);
-
-			// Create the filtered table - use CREATE TABLE without TEMPORARY to ensure visibility
-			const sql = `
-				CREATE TABLE ${tempTableName} AS
-				SELECT ${columnsStr} FROM ${sourceTable}
-				WHERE ST_Within(
-				ST_Point(${longitudeColumn}, ${latitudeColumn}), 
-				ST_GeomFromGeoJSON('${geojsonString}')
-				)
-			`;
-
-			await client.query(sql);
-
-			// Verify the table exists
-			const tableCheck = await client.query(
-				`SELECT name FROM sqlite_master WHERE type='table' AND name='${tempTableName}'`
+			// Use the manager to get or create filter table
+			const filterManager = GeometryFilterManager.getInstance();
+			const filterInfo = await filterManager.getOrCreateFilterTable(
+				feature,
+				client,
+				sourceTable,
+				columns
 			);
 
-			if (!tableCheck || tableCheck.length === 0) {
-				throw new Error(`Failed to create table ${tempTableName}`);
-			}
-
-			// Get count of filtered rows
-			const countResult = await client.queryScalar<number>(`SELECT COUNT(*) FROM ${tempTableName}`);
-
-			console.log(`Created table '${tempTableName}' with ${countResult} rows from filter`);
-
-			return {
-				tableName: tempTableName,
-				rowCount: countResult || 0,
-				sourceTable: sourceTable,
-				columns: columns
-			};
+			return filterInfo;
 		} catch (error) {
 			console.error('Error creating filtered table:', error);
 			return null;
@@ -536,7 +522,7 @@
 		const normalizedSize = (point.size - sizeMin) / (sizeMax - sizeMin);
 		return minPointRadius + normalizedSize * (maxPointRadius - minPointRadius);
 	}
-	// Dynamic color calculation
+
 	function getPointColor(point: any) {
 		if (!colorColumn || point.color === null) {
 			return [64, 64, 180, Math.floor(opacity * 255)]; // Default blue
@@ -547,38 +533,30 @@
 		return [point.color, Math.floor(opacity * 255)];
 	}
 
-	async function* loadDataFiltering(polygon: any) {
+	async function* loadDataFromTable(tableName: string) {
 		try {
 			yield [];
 
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			if ($chosenDataset !== null) {
-				const filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+			// Build column list for query (same as your existing logic)
+			const columns = [latitudeColumn, longitudeColumn];
+			if (sizeColumn) columns.push(sizeColumn);
+			if (colorColumn) columns.push(colorColumn);
+			if (labelColumn) columns.push(labelColumn);
 
-				const columns = [latitudeColumn, longitudeColumn];
-				if (sizeColumn) columns.push(sizeColumn);
-				if (colorColumn) columns.push(colorColumn);
-				if (labelColumn) columns.push(labelColumn);
+			const columnsStr = columns.join(', ');
 
-				const columnsStr = columns.join(', ');
+			console.log(`Loading data from filter table: ${tableName}`);
 
-				const query = `
-                SELECT ${columnsStr} FROM ${filename} 
-                WHERE ST_Within(
-                    ST_Point(${longitudeColumn}, ${latitudeColumn}), 
-                    ST_GeomFromGeoJSON(?)
-                )
-            `;
+			// Query the pre-filtered table instead of doing spatial filtering again
+			const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${tableName}`);
 
-				// ✅ Make sure we're passing GeoJSON, not WKT
-				const geojsonString = JSON.stringify(polygon.geometry);
-				const stream = await client.queryStream(query, [geojsonString]);
-				yield* transformRows(stream.readRows());
-			}
+			// Use your existing transformRows function
+			yield* transformRows(stream.readRows());
 		} catch (error) {
-			console.error('Error filtering data:', error);
+			console.error(`Error loading data from table ${tableName}:`, error);
 			yield [];
 		}
 	}
