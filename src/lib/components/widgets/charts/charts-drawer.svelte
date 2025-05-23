@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { Drawer } from 'vaul-svelte';
-	import { openDrawer } from '$lib/components/io/stores';
-	//import * as Chart from '$lib/components/ui/chart/index.js';
-
 	import BarChart from './charts/bar-chart.svelte';
+	import { openDrawer } from '$lib/components/io/stores';
+	import { Drawer } from 'vaul-svelte';
 </script>
 
 <Drawer.Root direction="right" open={$openDrawer}>
