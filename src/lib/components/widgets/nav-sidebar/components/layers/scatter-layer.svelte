@@ -2,16 +2,28 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { chosenDataset, layers } from '$lib/components/io/stores';
+	import {
+		chosenDataset,
+		clickedGeoJSON,
+		selectedGeometryId,
+		layers
+	} from '$lib/components/io/stores';
+
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { AlertCircle } from '@lucide/svelte';
 	import { flyTo } from './utils/flyto';
+	import {
+		GeometryFilterManager,
+		getGeometryId
+	} from '$lib/components/io/geometry-management.svelte';
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 	import ConfigField from './utils/config-field.svelte';
+
+	//import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
@@ -48,10 +60,49 @@
 
 	let hasInitialized = $state(false);
 
+	let currentFilter = $state();
+	let isFiltered = $state(false);
 	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(
 		latitudeColumn !== undefined && longitudeColumn !== undefined
 	);
+
+	$effect(() => {
+		if (!requiredColumnsSelected) return;
+
+		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
+			// New filter applied
+			currentFilter = $clickedGeoJSON;
+			isFiltered = true;
+
+			const geometryId = getGeometryId($clickedGeoJSON);
+
+			// Set the selected geometry ID
+			selectedGeometryId.set(geometryId);
+
+			// Create or get existing filter table
+			createTempFilterTable($clickedGeoJSON).then((filterInfo) => {
+				if (filterInfo) {
+					console.log(`Geometry ${geometryId} mapped to table: ${filterInfo.tableName}`);
+
+					// Update layer with filtered data from the table
+					layers.updateProps(layer.id, {
+						data: loadDataFromTable(filterInfo.tableName)
+					});
+				}
+			});
+		} else if (!$clickedGeoJSON && isFiltered) {
+			// Filter cleared
+			currentFilter = null;
+			isFiltered = false;
+			selectedGeometryId.set(null);
+
+			// Return to original data
+			layers.updateProps(layer.id, {
+				data: loadData()
+			});
+		}
+	});
 
 	$effect(() => {
 		if (requiredColumnsSelected && !hasInitialized) {
@@ -73,7 +124,6 @@
 			(currentLayer.props.latColumn !== latitudeColumn ||
 				currentLayer.props.lngColumn !== longitudeColumn)
 		) {
-			console.log('Latitude or longitude columns changed, recreating layer');
 			createScatterLayer();
 		}
 	});
@@ -148,6 +198,54 @@
 			updateOptionalProps(changedProps);
 		}
 	});
+
+	// Updated createTempFilterTable function
+	async function createTempFilterTable(feature: any) {
+		if (!feature || !feature.geometry) {
+			console.error('Invalid feature for filtering');
+			return null;
+		}
+
+		try {
+			const db = SingletonDatabase.getInstance();
+			const client = await db.init();
+
+			// Load spatial extension
+			try {
+				await db.hasExtension('spatial');
+			} catch (e) {
+				console.log('Spatial extension handling:', e);
+			}
+
+			if ($chosenDataset === null) {
+				console.error('No dataset selected');
+				return null;
+			}
+
+			const sourceTable = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+
+			// Build columns array
+			if (!latitudeColumn || !longitudeColumn) return;
+			const columns = [latitudeColumn, longitudeColumn];
+			if (sizeColumn) columns.push(sizeColumn);
+			if (colorColumn) columns.push(colorColumn);
+			if (labelColumn) columns.push(labelColumn);
+
+			// Use the manager to get or create filter table
+			const filterManager = GeometryFilterManager.getInstance();
+			const filterInfo = await filterManager.getOrCreateFilterTable(
+				feature,
+				client,
+				sourceTable,
+				columns
+			);
+
+			return filterInfo;
+		} catch (error) {
+			console.error('Error creating filtered table:', error);
+			return null;
+		}
+	}
 
 	async function* transformRows(
 		rows: AsyncIterable<Record<string, any>[]>
@@ -325,18 +423,13 @@
 				layers.remove(layer.id);
 			}
 
-			// Create a new scatter layer with the properties
-
 			const newScatterLayer = LayerFactory.create('scatter', {
 				id: layer.id,
 				props: layerProps
 			});
 
-			// Add the new scatter layer
 			layers.add(newScatterLayer);
-			console.log('==================== SCATTER LAYER CREATED ====================');
-		} catch (error) {
-			//@ts-expect-error
+		} catch (error: any) {
 			console.error('Error creating scatter layer:', error, error.stack);
 		}
 	}
@@ -429,7 +522,7 @@
 		const normalizedSize = (point.size - sizeMin) / (sizeMax - sizeMin);
 		return minPointRadius + normalizedSize * (maxPointRadius - minPointRadius);
 	}
-	// Dynamic color calculation
+
 	function getPointColor(point: any) {
 		if (!colorColumn || point.color === null) {
 			return [64, 64, 180, Math.floor(opacity * 255)]; // Default blue
@@ -438,6 +531,34 @@
 		// In a real implementation, this would use the appropriate color scale
 		// Here we're just passing the value along and assuming the layer will handle color mapping
 		return [point.color, Math.floor(opacity * 255)];
+	}
+
+	async function* loadDataFromTable(tableName: string) {
+		try {
+			yield [];
+
+			const db = SingletonDatabase.getInstance();
+			const client = await db.init();
+
+			// Build column list for query (same as your existing logic)
+			const columns = [latitudeColumn, longitudeColumn];
+			if (sizeColumn) columns.push(sizeColumn);
+			if (colorColumn) columns.push(colorColumn);
+			if (labelColumn) columns.push(labelColumn);
+
+			const columnsStr = columns.join(', ');
+
+			console.log(`Loading data from filter table: ${tableName}`);
+
+			// Query the pre-filtered table instead of doing spatial filtering again
+			const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${tableName}`);
+
+			// Use your existing transformRows function
+			yield* transformRows(stream.readRows());
+		} catch (error) {
+			console.error(`Error loading data from table ${tableName}:`, error);
+			yield [];
+		}
 	}
 
 	async function* loadData() {
@@ -450,7 +571,7 @@
 			const client = await db.init();
 
 			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
+				var filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
 
 				// Build column list for query
 				const columns = [latitudeColumn, longitudeColumn];

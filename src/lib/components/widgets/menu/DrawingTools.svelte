@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
-	import { clickedGeoJSON, openDrawer } from '$lib/components/io/stores';
+	import { clickedGeoJSON, openDrawer, chosenDataset, datasets } from '$lib/components/io/stores';
 	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	// Define props with correct typing
@@ -84,30 +84,6 @@
 		}
 	}
 
-	// Test function to create a polygon mask over part of Manhattan
-	function createTestMask() {
-		// Rectangle covering part of Midtown Manhattan
-		const manhattanPolygon = {
-			type: 'Feature',
-			properties: {},
-			geometry: {
-				type: 'Polygon',
-				coordinates: [
-					[
-						[-73.99, 40.75], // Southwest corner
-						[-73.97, 40.75], // Southeast corner
-						[-73.97, 40.77], // Northeast corner
-						[-73.99, 40.77], // Northwest corner
-						[-73.99, 40.75] // Close the polygon
-					]
-				]
-			}
-		};
-
-		// Call your mask creation function with this polygon
-		onDrawingComplete(manhattanPolygon);
-	}
-
 	function handleMouseUp(e: any) {
 		if (isDrawing) {
 			const currentFeatures = $drawInstance?.getAll().features || [];
@@ -153,13 +129,13 @@
 
 	function trashSelected() {
 		if ($drawInstance) {
-			try {
-				$drawInstance.trash();
-			} catch (error) {
-				console.error('Error deleting features:', error);
+			const selectedIds = $drawInstance.getSelectedIds();
+
+			if (selectedIds.length > 0) {
+				$drawInstance.delete(selectedIds);
 			}
 		} else {
-			console.warn('Draw object not initialized yet');
+			console.warn('Draw instance not available');
 		}
 	}
 </script>

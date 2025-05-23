@@ -4,16 +4,25 @@ import type { TableField } from './DuckDBWASMClient.svelte';
 import { LayerStore } from './layer-management.svelte';
 import { type MapViewState } from '@deck.gl/core';
 
-type FileUpload = {
-	filename: string;
+type Dataset = {
+	datasetName: string;
 	datasetID: string;
 	schema: TableField[];
 };
 
-export const fileUploadStore = writable<FileUpload[]>(storeFromLocalStorage('fileUploadStore', []));
-export const chosenDataset = writable<FileUpload | null>(
-	storeFromLocalStorage('chosenDataset', null)
-);
+interface FilterTableInfo {
+	tableName: string;
+	geometryId: string;
+	geometrySnapshot: string;
+	rowCount: number;
+	columns: string[];
+	sourceTable: string;
+	lastUsed: number;
+	created: number;
+}
+
+export const datasets = writable<Dataset[]>(storeFromLocalStorage('datasets', []));
+export const chosenDataset = writable<Dataset | null>(storeFromLocalStorage('chosenDataset', null));
 
 export const layers = new LayerStore();
 export const mapboxDrawInstance = writable<any>();
@@ -21,6 +30,10 @@ export const editableGeoJSON = writable<any[]>([]);
 export const openDrawer = writable<boolean>(false);
 export const clickedGeoJSON = writable<any | undefined>();
 export const openSidebar = writable<boolean>(true);
+export const geometryTableMap = writable<Map<string, FilterTableInfo>>(new Map());
+
+// Currently selected geometry (for easy access)
+export const selectedGeometryId = writable<string | null>(null);
 
 export const mapViewState = writable<MapViewState>({
 	longitude: -74,
