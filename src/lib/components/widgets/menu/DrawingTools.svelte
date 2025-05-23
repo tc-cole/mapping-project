@@ -153,13 +153,17 @@
 
 	function trashSelected() {
 		if ($drawInstance) {
-			try {
-				$drawInstance.trash();
-			} catch (error) {
-				console.error('Error deleting features:', error);
+			const selectedIds = $drawInstance.getSelectedIds();
+			console.log('Selected features:', selectedIds);
+
+			if (selectedIds.length > 0) {
+				$drawInstance.delete(selectedIds);
+				console.log('Trash command executed');
+			} else {
+				console.log('No features selected to delete');
 			}
 		} else {
-			console.warn('Draw object not initialized yet');
+			console.warn('Draw instance not available');
 		}
 	}
 </script>
