@@ -19,6 +19,7 @@ export const editableGeoJSON = writable<any[]>([]);
 export const openDrawer = writable<boolean>(false);
 export const clickedGeoJSON = writable<any | undefined>();
 export const openSidebar = writable<boolean>(true);
+export const geometryTableMap = writable<Map<string, string>>(new Map());
 
 export const mapViewState = writable<MapViewState>({
 	longitude: -74,

@@ -2,7 +2,12 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { chosenDataset, clickedGeoJSON, layers } from '$lib/components/io/stores';
+	import {
+		chosenDataset,
+		clickedGeoJSON,
+		layers,
+		geometryTableMap
+	} from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
@@ -12,7 +17,7 @@
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 	import ConfigField from './utils/config-field.svelte';
-	import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
+	//import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
@@ -57,6 +62,7 @@
 	);
 
 	$effect(() => {
+		if (!requiredColumnsSelected) return;
 		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
 			// New filter applied ✅
 			currentFilter = $clickedGeoJSON;
@@ -64,6 +70,7 @@
 			layers.updateProps(layer.id, {
 				data: loadDataFiltering($clickedGeoJSON)
 			});
+			createTempFilterTable($clickedGeoJSON);
 		} else if (!$clickedGeoJSON && isFiltered) {
 			// Filter cleared ✅
 			currentFilter = null;
@@ -168,6 +175,91 @@
 			updateOptionalProps(changedProps);
 		}
 	});
+
+	async function createTempFilterTable(feature: any) {
+		if (!feature || !feature.geometry) {
+			console.error('Invalid feature for filtering');
+			return null;
+		}
+
+		try {
+			const db = SingletonDatabase.getInstance();
+			const client = await db.init();
+
+			// First, load spatial extension
+			try {
+				await db.hasExtension('spatial');
+			} catch (e) {
+				console.log('Spatial extension already loaded or error installing', e);
+			}
+
+			if ($chosenDataset === null) {
+				console.error('No dataset selected');
+				return null;
+			}
+
+			// Generate a unique table name with alphanumeric characters only
+			const timestamp = Date.now();
+			const tempTableName = `filtered_${timestamp}`;
+
+			// Clean up any existing table with this name
+			try {
+				await client.query(`DROP TABLE IF EXISTS ${tempTableName}`);
+			} catch (e) {
+				// Ignore drop errors
+			}
+
+			// Get the source table name
+			const sourceTable = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+
+			// Get column list (use the same columns as your scatter layer)
+			const columns = [latitudeColumn, longitudeColumn];
+			if (sizeColumn) columns.push(sizeColumn);
+			if (colorColumn) columns.push(colorColumn);
+			if (labelColumn) columns.push(labelColumn);
+
+			const columnsStr = columns.join(', ');
+
+			// Convert the GeoJSON to a string for the query
+			const geojsonString = JSON.stringify(feature.geometry);
+
+			// Create the filtered table - use CREATE TABLE without TEMPORARY to ensure visibility
+			const sql = `
+				CREATE TABLE ${tempTableName} AS
+				SELECT ${columnsStr} FROM ${sourceTable}
+				WHERE ST_Within(
+				ST_Point(${longitudeColumn}, ${latitudeColumn}), 
+				ST_GeomFromGeoJSON('${geojsonString}')
+				)
+			`;
+
+			await client.query(sql);
+
+			// Verify the table exists
+			const tableCheck = await client.query(
+				`SELECT name FROM sqlite_master WHERE type='table' AND name='${tempTableName}'`
+			);
+
+			if (!tableCheck || tableCheck.length === 0) {
+				throw new Error(`Failed to create table ${tempTableName}`);
+			}
+
+			// Get count of filtered rows
+			const countResult = await client.queryScalar<number>(`SELECT COUNT(*) FROM ${tempTableName}`);
+
+			console.log(`Created table '${tempTableName}' with ${countResult} rows from filter`);
+
+			return {
+				tableName: tempTableName,
+				rowCount: countResult || 0,
+				sourceTable: sourceTable,
+				columns: columns
+			};
+		} catch (error) {
+			console.error('Error creating filtered table:', error);
+			return null;
+		}
+	}
 
 	async function* transformRows(
 		rows: AsyncIterable<Record<string, any>[]>
