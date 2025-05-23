@@ -4,16 +4,14 @@ import type { TableField } from './DuckDBWASMClient.svelte';
 import { LayerStore } from './layer-management.svelte';
 import { type MapViewState } from '@deck.gl/core';
 
-type FileUpload = {
-	filename: string;
+type Dataset = {
+	datasetName: string;
 	datasetID: string;
 	schema: TableField[];
 };
 
-export const fileUploadStore = writable<FileUpload[]>(storeFromLocalStorage('fileUploadStore', []));
-export const chosenDataset = writable<FileUpload | null>(
-	storeFromLocalStorage('chosenDataset', null)
-);
+export const datasets = writable<Dataset[]>(storeFromLocalStorage('datasets', []));
+export const chosenDataset = writable<Dataset | null>(storeFromLocalStorage('chosenDataset', null));
 
 export const layers = new LayerStore();
 export const mapboxDrawInstance = writable<any>();

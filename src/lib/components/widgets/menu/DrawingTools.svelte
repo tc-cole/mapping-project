@@ -84,30 +84,6 @@
 		}
 	}
 
-	// Test function to create a polygon mask over part of Manhattan
-	function createTestMask() {
-		// Rectangle covering part of Midtown Manhattan
-		const manhattanPolygon = {
-			type: 'Feature',
-			properties: {},
-			geometry: {
-				type: 'Polygon',
-				coordinates: [
-					[
-						[-73.99, 40.75], // Southwest corner
-						[-73.97, 40.75], // Southeast corner
-						[-73.97, 40.77], // Northeast corner
-						[-73.99, 40.77], // Northwest corner
-						[-73.99, 40.75] // Close the polygon
-					]
-				]
-			}
-		};
-
-		// Call your mask creation function with this polygon
-		onDrawingComplete(manhattanPolygon);
-	}
-
 	function handleMouseUp(e: any) {
 		if (isDrawing) {
 			const currentFeatures = $drawInstance?.getAll().features || [];
@@ -154,13 +130,9 @@
 	function trashSelected() {
 		if ($drawInstance) {
 			const selectedIds = $drawInstance.getSelectedIds();
-			console.log('Selected features:', selectedIds);
 
 			if (selectedIds.length > 0) {
 				$drawInstance.delete(selectedIds);
-				console.log('Trash command executed');
-			} else {
-				console.log('No features selected to delete');
 			}
 		} else {
 			console.warn('Draw instance not available');

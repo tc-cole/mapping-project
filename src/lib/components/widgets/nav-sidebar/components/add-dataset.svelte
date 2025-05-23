@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
-	import { fileUploadStore } from '$lib/components/io/stores';
+	import { datasets } from '$lib/components/io/stores';
 	import { generateID } from '$lib/components/io/generateID';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index';
@@ -35,10 +35,10 @@
 		const dataset = {
 			datasetID: generateID(),
 			schema: columns,
-			filename: fname
+			datasetName: fname
 		};
 
-		fileUploadStore.update((current) => {
+		datasets.update((current) => {
 			return [...current, dataset];
 		});
 	}
@@ -89,7 +89,7 @@
 								class:!border-accent-500={fileUpload.isDragging}
 							>
 								{#if fileUpload.isDragging}
-									<p class="font-medium text-accent-400">Drop files here</p>
+									<p class="text-accent-400 font-medium">Drop files here</p>
 								{:else}
 									<div class="pointer-events-none flex flex-col items-center gap-2">
 										<UploadIcon class="text-4xl" />

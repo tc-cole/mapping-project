@@ -2,7 +2,7 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
 	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { chosenDataset, layers } from '$lib/components/io/stores';
+	import { chosenDataset, clickedGeoJSON, layers } from '$lib/components/io/stores';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
@@ -12,6 +12,7 @@
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 	import ConfigField from './utils/config-field.svelte';
+	import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
@@ -48,10 +49,30 @@
 
 	let hasInitialized = $state(false);
 
+	let currentFilter = $state();
+	let isFiltered = $state(false);
 	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(
 		latitudeColumn !== undefined && longitudeColumn !== undefined
 	);
+
+	$effect(() => {
+		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
+			// New filter applied ✅
+			currentFilter = $clickedGeoJSON;
+			isFiltered = true;
+			layers.updateProps(layer.id, {
+				data: loadDataFiltering($clickedGeoJSON)
+			});
+		} else if (!$clickedGeoJSON && isFiltered) {
+			// Filter cleared ✅
+			currentFilter = null;
+			isFiltered = false;
+			layers.updateProps(layer.id, {
+				data: loadData()
+			});
+		}
+	});
 
 	$effect(() => {
 		if (requiredColumnsSelected && !hasInitialized) {
@@ -73,7 +94,6 @@
 			(currentLayer.props.latColumn !== latitudeColumn ||
 				currentLayer.props.lngColumn !== longitudeColumn)
 		) {
-			console.log('Latitude or longitude columns changed, recreating layer');
 			createScatterLayer();
 		}
 	});
@@ -325,18 +345,13 @@
 				layers.remove(layer.id);
 			}
 
-			// Create a new scatter layer with the properties
-
 			const newScatterLayer = LayerFactory.create('scatter', {
 				id: layer.id,
 				props: layerProps
 			});
 
-			// Add the new scatter layer
 			layers.add(newScatterLayer);
-			console.log('==================== SCATTER LAYER CREATED ====================');
-		} catch (error) {
-			//@ts-expect-error
+		} catch (error: any) {
 			console.error('Error creating scatter layer:', error, error.stack);
 		}
 	}
@@ -440,6 +455,42 @@
 		return [point.color, Math.floor(opacity * 255)];
 	}
 
+	async function* loadDataFiltering(polygon: any) {
+		try {
+			yield [];
+
+			const db = SingletonDatabase.getInstance();
+			const client = await db.init();
+
+			if ($chosenDataset !== null) {
+				const filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+
+				const columns = [latitudeColumn, longitudeColumn];
+				if (sizeColumn) columns.push(sizeColumn);
+				if (colorColumn) columns.push(colorColumn);
+				if (labelColumn) columns.push(labelColumn);
+
+				const columnsStr = columns.join(', ');
+
+				const query = `
+                SELECT ${columnsStr} FROM ${filename} 
+                WHERE ST_Within(
+                    ST_Point(${longitudeColumn}, ${latitudeColumn}), 
+                    ST_GeomFromGeoJSON(?)
+                )
+            `;
+
+				// ✅ Make sure we're passing GeoJSON, not WKT
+				const geojsonString = JSON.stringify(polygon.geometry);
+				const stream = await client.queryStream(query, [geojsonString]);
+				yield* transformRows(stream.readRows());
+			}
+		} catch (error) {
+			console.error('Error filtering data:', error);
+			yield [];
+		}
+	}
+
 	async function* loadData() {
 		try {
 			// Initial empty dataset
@@ -450,7 +501,7 @@
 			const client = await db.init();
 
 			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
+				var filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
 
 				// Build column list for query
 				const columns = [latitudeColumn, longitudeColumn];
