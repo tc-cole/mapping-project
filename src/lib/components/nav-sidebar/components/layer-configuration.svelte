@@ -5,7 +5,7 @@
 	import LineLayer from './layers/line-layer.svelte';
 	import ArcLayer from './layers/arc-layer.svelte';
 	import H3Layer from './layers/h3-layer.svelte';
-	import { layerDefs } from '$lib/components/io/layer-management.svelte'; // singleton instance
+	import { layerDefs } from '$lib/io/layer-management.svelte'; // singleton instance
 	import GeoJSONLayer from './layers/geojson-layer.svelte';
 
 	let { layertype, layer } = $props();

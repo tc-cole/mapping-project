@@ -8,7 +8,7 @@
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
 	import mapboxgl from 'mapbox-gl';
 
-	import { layers, editableGeoJSON, mapViewState } from '$lib/components/io/stores';
+	import { layers, editableGeoJSON, mapViewState } from '$lib/io/stores';
 	import { Deck, MapView } from '@deck.gl/core';
 	import { onDestroy, onMount } from 'svelte';
 

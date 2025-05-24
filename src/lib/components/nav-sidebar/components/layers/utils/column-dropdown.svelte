@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { chosenDataset } from '$lib/components/io/stores';
+	import { chosenDataset } from '$lib/io/stores';
 	import { ChevronDown, Check } from '@lucide/svelte';
 	import { cn } from '$lib/utils';
 

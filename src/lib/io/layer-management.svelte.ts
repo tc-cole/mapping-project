@@ -1,7 +1,7 @@
 // src/lib/deck/LayerStore.ts
 import { writable, get, type Writable } from 'svelte/store';
 import { Layer } from '@deck.gl/core';
-import { storeFromLocalStorage } from '$lib/components/io/storage';
+import { storeFromLocalStorage } from '$lib/io/storage';
 import {
 	ScatterplotLayer,
 	GeoJsonLayer,

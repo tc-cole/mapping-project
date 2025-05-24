@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { datasets, chosenDataset } from '$lib/components/io/stores';
+	import { datasets, chosenDataset } from '$lib/io/stores';
 	import SidebarMenuSubButton from '$lib/components/ui/sidebar/sidebar-menu-sub-button.svelte';
 	// import SidebarMenuSubItem from '$lib/components/ui/sidebar/sidebar-menu-sub-item.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';

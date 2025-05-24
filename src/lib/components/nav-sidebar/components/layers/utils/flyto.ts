@@ -1,4 +1,4 @@
-import { mapViewState } from '$lib/components/io/stores';
+import { mapViewState } from '$lib/io/stores';
 import { FlyToInterpolator } from '@deck.gl/core';
 
 export function flyTo(lon: number, lat: number, zoom: number = 10) {

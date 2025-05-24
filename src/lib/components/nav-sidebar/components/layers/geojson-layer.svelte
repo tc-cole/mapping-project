@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
+	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
+	import { LayerFactory } from '$lib/io/layer-management.svelte';
 
-	import { chosenDataset, layers } from '$lib/components/io/stores';
-	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
+	import { chosenDataset, layers } from '$lib/io/stores';
+	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Sectional from './utils/sectional.svelte';
@@ -503,7 +503,7 @@
 			const client = await db.init();
 
 			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
+				var filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
 
 				// Build column list for query
 				const columnsList = [geojsonColumn];

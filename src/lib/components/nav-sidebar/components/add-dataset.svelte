@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
-	import { datasets } from '$lib/components/io/stores';
-	import { generateID } from '$lib/components/io/generateID';
+	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
+	import { datasets } from '$lib/io/stores';
+	import { generateID } from '$lib/io/generateID';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index';
 

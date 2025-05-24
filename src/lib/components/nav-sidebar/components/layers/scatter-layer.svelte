@@ -1,23 +1,15 @@
 <script lang="ts">
-	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
-	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import {
-		chosenDataset,
-		clickedGeoJSON,
-		selectedGeometryId,
-		layers
-	} from '$lib/components/io/stores';
+	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
+	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
+	import { LayerFactory } from '$lib/io/layer-management.svelte';
+	import { chosenDataset, clickedGeoJSON, selectedGeometryId, layers } from '$lib/io/stores';
 
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { AlertCircle } from '@lucide/svelte';
 	import { flyTo } from './utils/flyto';
-	import {
-		GeometryFilterManager,
-		getGeometryId
-	} from '$lib/components/io/geometry-management.svelte';
+	import { GeometryFilterManager, getGeometryId } from '$lib/io/geometry-management.svelte';
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';

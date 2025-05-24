@@ -1,4 +1,4 @@
-import { storeFromLocalStorage } from '$lib/components/io/storage';
+import { storeFromLocalStorage } from '$lib/io/storage';
 import { writable } from 'svelte/store';
 import type { TableField } from './DuckDBWASMClient.svelte';
 import { LayerStore } from './layer-management.svelte';

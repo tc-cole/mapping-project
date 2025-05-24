@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
-	import { clickedGeoJSON, openDrawer, chosenDataset, datasets } from '$lib/components/io/stores';
+	import { clickedGeoJSON, openDrawer, chosenDataset, datasets } from '$lib/io/stores';
 	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
 	// Define props with correct typing

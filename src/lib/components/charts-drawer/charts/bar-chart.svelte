@@ -2,8 +2,8 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { scaleBand } from 'd3-scale';
 	import { BarChart } from 'layerchart';
-	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
-	import { clickedGeoJSON, selectedGeometryId } from '$lib/components/io/stores';
+	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
+	import { clickedGeoJSON, selectedGeometryId } from '$lib/io/stores';
 
 	let { data = [] } = $props();
 

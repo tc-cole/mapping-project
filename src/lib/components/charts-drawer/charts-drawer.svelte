@@ -1,6 +1,6 @@
 <script lang="ts">
 	import BarChart from './charts/bar-chart.svelte';
-	import { openDrawer } from '$lib/components/io/stores';
+	import { openDrawer } from '$lib/io/stores';
 	import { Drawer } from 'vaul-svelte';
 </script>
 

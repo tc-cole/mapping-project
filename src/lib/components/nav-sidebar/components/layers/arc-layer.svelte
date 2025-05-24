@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { checkNameForSpacesAndHyphens } from '$lib/components/io/FileUtils';
-	import { LayerFactory } from '$lib/components/io/layer-management.svelte';
-	import { layers } from '$lib/components/io/stores';
-	import { chosenDataset } from '$lib/components/io/stores';
-	import { SingletonDatabase } from '$lib/components/io/DuckDBWASMClient.svelte';
+	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
+	import { LayerFactory } from '$lib/io/layer-management.svelte';
+	import { layers } from '$lib/io/stores';
+	import { chosenDataset } from '$lib/io/stores';
+	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
 	import ConfigField from './utils/config-field.svelte';
