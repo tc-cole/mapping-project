@@ -7,6 +7,8 @@
 <script lang="ts">
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
 	import mapboxgl from 'mapbox-gl';
+	import RadiusMode from "$lib/components/menu/utils/custom-draw-circle"
+	console.log(RadiusMode)
 
 	import { layers, editableGeoJSON, mapViewState } from '$lib/io/stores';
 	import { Deck, MapView } from '@deck.gl/core';
@@ -88,12 +90,18 @@
 
 		map.on('load', () => {
 			draw = new MapboxDraw({
+				userProperties: true,
+
 				displayControlsDefault: false,
 				controls: {
 					polygon: false,
 					point: false,
 					line_string: false,
 					trash: false
+				},
+				modes: {
+					...MapboxDraw.modes,
+					draw_circle: RadiusMode
 				}
 			});
 

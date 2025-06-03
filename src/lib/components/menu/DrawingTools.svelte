@@ -1,9 +1,14 @@
 <script lang="ts">
-	import { Move, Trash2, CircleDot, SplineIcon, Hexagon } from '@lucide/svelte';
-	import { clickedGeoJSON, openDrawer, chosenDataset, datasets } from '$lib/io/stores';
+	import { Move, Trash2, CircleDot, SplineIcon, Hexagon, Circle } from '@lucide/svelte';
+	import { clickedGeoJSON, openDrawer } from '$lib/io/stores';
 	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
+	import { MaskExtension } from '@deck.gl/extensions';
 
-	// Define props with correct typing
+	import { LayerFactory } from '$lib/io/layer-management.svelte';
+	import { layers } from '$lib/io/stores';
+	
+	// Import your custom RadiusMode
+	import RadiusMode from './utils/custom-draw-circle'; // Adjust path as needed
 
 	let drawnFeatures = $state<any[]>([]);
 	let activeEditTool = $state('simple_select');
@@ -12,6 +17,9 @@
 
 	$effect(() => {
 		if ($mapInstance && $drawInstance) {
+			// Register the custom circle mode
+			$drawInstance.modes.draw_circle = RadiusMode;
+			
 			// Set up event handlers for draw actions
 			$mapInstance.on('draw.create', handleDrawCreate);
 			$mapInstance.on('draw.update', handleDrawUpdate);
@@ -39,20 +47,39 @@
 
 	// Handle creating new features
 	function handleDrawCreate(e: any) {
-		drawnFeatures = [...drawnFeatures, ...e.features];
-		lastCompletedFeature = e.features[0];
+		const newFeatures = e.features.map((feature: any) => {
+			// If it's a circle (point with radius), convert it to a polygon for deck.gl
+			if (feature.geometry.type === 'Point' && feature.properties?.radius) {
+				const circlePolygon = createCirclePolygon(
+					feature.geometry.coordinates,
+					parseFloat(feature.properties.radius) / 1000 // Convert meters to km
+				);
+				
+				return {
+					...feature,
+					geometry: circlePolygon.geometry,
+					properties: {
+						...feature.properties,
+						originalType: 'circle',
+						center: feature.geometry.coordinates,
+						radiusKm: parseFloat(feature.properties.radius) / 1000
+					}
+				};
+			}
+			return feature;
+		});
+
+		drawnFeatures = [...drawnFeatures, ...newFeatures];
+		lastCompletedFeature = newFeatures[0];
 
 		isDrawing = false;
-
-		onDrawingComplete(e.features[0]);
+		onDrawingComplete(newFeatures[0]);
 	}
 
 	function handleDrawUpdate(e: any) {
 		const updatedIds = e.features.map((f: any) => f.id);
 		drawnFeatures = [...drawnFeatures.filter((f) => !updatedIds.includes(f.id)), ...e.features];
 		lastCompletedFeature = e.features[0];
-
-		// The editing is complete when a feature is updated
 		isDrawing = false;
 	}
 
@@ -64,7 +91,6 @@
 
 	function handleModeChange(e: any) {
 		activeEditTool = e.mode;
-
 		isDrawing = e.mode.startsWith('draw_');
 
 		if (e.mode === 'simple_select') {
@@ -77,7 +103,6 @@
 		clickedGeoJSON.set(e.features[0]);
 	}
 
-	// This event fires continuously during drawing
 	function handleDrawRender(e: any) {
 		if (activeEditTool.startsWith('draw_') && !activeEditTool.includes('select')) {
 			isDrawing = true;
@@ -105,13 +130,71 @@
 		handleMouseUp(e);
 	}
 
-	function onDrawingComplete(feature: any) {
-		if (!feature || !feature.geometry) {
-			console.error('Invalid feature drawn');
-			return;
-		}
+	// Helper function to create a circle polygon from center and radius
+	function createCirclePolygon(center: [number, number], radiusInKm: number, points: number = 64) {
+		const coords = {
+			latitude: center[1],
+			longitude: center[0]
+		};
+		const km = radiusInKm;
 
-		clickedGeoJSON.set(feature);
+		const ret = [];
+		const distanceX = km / (111.32 * Math.cos((coords.latitude * Math.PI) / 180));
+		const distanceY = km / 110.574;
+
+		let theta, x, y;
+		for (let i = 0; i < points; i += 1) {
+			theta = (i / points) * (2 * Math.PI);
+			x = distanceX * Math.cos(theta);
+			y = distanceY * Math.sin(theta);
+			ret.push([coords.longitude + x, coords.latitude + y]);
+		}
+		ret.push(ret[0]); // Close the polygon
+
+		return {
+			type: 'Feature',
+			geometry: {
+				type: 'Polygon',
+				coordinates: [ret]
+			}
+		};
+	}
+
+	// Function that runs whenever a drawing is completed
+	function onDrawingComplete(feature: any) {
+		// Create a mask layer with the drawn feature
+		const maskLayerId = `mask-${Date.now()}`;
+		const geojsonMaskLayer = LayerFactory.create('geojson', {
+			id: maskLayerId,
+			props: {
+				operation: 'mask',
+				data: feature,
+				stroked: true,
+				filled: true,
+				lineWidthMinPixels: 2,
+				getLineColor: [255, 255, 255],
+				getFillColor: [0, 0, 0, 0] // Transparent fill
+			}
+		});
+
+		// Add the mask layer to the deck
+		layers.add(geojsonMaskLayer);
+
+		// Apply the mask extension to all existing layers
+		const layersSnapshot = layers.snapshot;
+
+		layers.transaction(() => {
+			for (const layer of layersSnapshot) {
+				if (layer.id === maskLayerId || layer.id.includes('basemap')) {
+					continue;
+				}
+
+				layers.updateProps(layer.id, {
+					extensions: [new MaskExtension()],
+					maskId: maskLayerId
+				});
+			}
+		});
 	}
 
 	function setDrawMode(mode: string) {
@@ -129,18 +212,18 @@
 
 	function trashSelected() {
 		if ($drawInstance) {
-			const selectedIds = $drawInstance.getSelectedIds();
-
-			if (selectedIds.length > 0) {
-				$drawInstance.delete(selectedIds);
+			try {
+				$drawInstance.trash();
+			} catch (error) {
+				console.error('Error deleting features:', error);
 			}
 		} else {
-			console.warn('Draw instance not available');
+			console.warn('Draw object not initialized yet');
 		}
 	}
 </script>
 
-<!-- Toolbar for quick access to editing tools - KEEPING ORIGINAL STYLING -->
+<!-- Toolbar for quick access to editing tools -->
 <div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">
 	<!-- Selection/Modify Tool -->
 	<button
@@ -180,6 +263,16 @@
 	>
 		<Hexagon size={20} />
 		<span class="sr-only">Draw Polygon</span>
+	</button>
+
+	<!-- Draw Circle Tool -->
+	<button
+		class={`rounded p-2 ${activeEditTool === 'draw_circle' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
+		title="Draw Circle"
+		onclick={() => setDrawMode('draw_circle')}
+	>
+		<Circle size={20} />
+		<span class="sr-only">Draw Circle</span>
 	</button>
 
 	<!-- Delete Tool -->
