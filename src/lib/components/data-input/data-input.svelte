@@ -44,8 +44,6 @@
 		datasets.update((current) => {
 			return [...current, dataset];
 		});
-
-		layers.add(LayerFactory.create('scatter'));
 	}
 
 	const files = $derived.by(() => {
