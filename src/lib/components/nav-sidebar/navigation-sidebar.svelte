@@ -13,10 +13,11 @@
 	}
 </script>
 
-<Sidebar.Root>
-	<Sidebar.Content>
+<Sidebar.Root side="right" variant="floating" class="h-1/2">
+	<Sidebar.Content class="h-1/2">
 		<AddDataset />
 		<Sidebar.Separator></Sidebar.Separator>
+		<!--
 
 		<Sidebar.Group class="-px-4">
 			<Button onclick={addLayer}>
@@ -24,6 +25,8 @@
 				<Plus />
 			</Button>
 		</Sidebar.Group>
+				-->
+
 		<Sidebar.Group class="-px-4">
 			<Sidebar.Menu>
 				{#each $layers as layer}
