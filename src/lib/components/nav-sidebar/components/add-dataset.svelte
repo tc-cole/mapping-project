@@ -47,7 +47,6 @@
 		if (fileUpload.selected instanceof SvelteSet) {
 			return Array.from(fileUpload.selected);
 		}
-		//@ts-expect-error
 		return [fileUpload.selected].filter((f): f is File => !!f);
 	});
 

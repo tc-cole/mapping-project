@@ -51,7 +51,7 @@
 
 	/* When sidebar is open, adjust the position */
 	.drawing-tools-container.sidebar-open {
-		left: calc(50% + 128px); /* 50% + half of sidebar width (256px/2) */
+		left: calc(30% + 128px); /* 50% + half of sidebar width (256px/2) */
 	}
 
 	/* When drawer is open, adjust the position */
