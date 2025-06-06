@@ -4,7 +4,7 @@
 	import { Drawer } from 'vaul-svelte';
 </script>
 
-<Drawer.Root direction="right" open={$openDrawer}>
+<Drawer.Root direction="left" open={$openDrawer}>
 	<Drawer.Portal>
 		<Drawer.Content
 			class="fixed bottom-0 right-0 top-0 flex h-full w-2/5 flex-col bg-zinc-800 shadow-lg"
