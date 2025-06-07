@@ -67,6 +67,12 @@
 		label: string | null;
 	}
 
+	let hasAppliedInference = $state(false);
+	let showInferenceBanner = $state(false);
+	let inferredPair = $state<{ latitude: string; longitude: string; confidence: number } | null>(
+		null
+	);
+
 	$effect(() => {
 		if (!requiredColumnsSelected) return;
 
@@ -101,6 +107,54 @@
 			layers.updateProps(layer.id, {
 				data: loadData()
 			});
+		}
+	});
+
+	function getLocationRecommendations() {
+		if (!$chosenDataset?.locationRecommendations) {
+			return {
+				hasRecommendations: false,
+				detectedColumns: [],
+				suggestedPairs: [],
+				bestPair: null
+			};
+		}
+
+		const recommendations = $chosenDataset.locationRecommendations;
+		return {
+			hasRecommendations: true,
+			detectedColumns: recommendations.detectedColumns,
+			suggestedPairs: recommendations.suggestedCoordinatePairs,
+			bestPair: recommendations.suggestedCoordinatePairs[0] || null
+		};
+	}
+
+	$effect(() => {
+		if ($chosenDataset && !hasAppliedInference) {
+			const recommendations = getLocationRecommendations();
+
+			if (recommendations.hasRecommendations && recommendations.bestPair) {
+				const bestPair = recommendations.bestPair;
+
+				// Auto-apply high confidence suggestions (>80%)
+				if (bestPair.confidence > 0.8) {
+					latitudeColumn = bestPair.latitude;
+					longitudeColumn = bestPair.longitude;
+					hasAppliedInference = true;
+
+					console.log('🎯 Auto-applied inferred coordinates:', {
+						latitude: bestPair.latitude,
+						longitude: bestPair.longitude,
+						confidence: Math.round(bestPair.confidence * 100) + '%',
+						dataset: $chosenDataset.datasetName
+					});
+				}
+				// Show banner for lower confidence suggestions
+				else if (bestPair.confidence > 0.5) {
+					inferredPair = bestPair;
+					showInferenceBanner = true;
+				}
+			}
 		}
 	});
 

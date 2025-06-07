@@ -17,7 +17,6 @@
 	// Add upload progress state
 	let isProcessing = $state(false);
 	let processingFile = $state<string>('');
-	let analysisProgress = $state<string>('');
 
 	const fileUpload = new FileUpload({
 		selected: [],
@@ -38,7 +37,6 @@
 	async function processFileForDatabase(file: File) {
 		isProcessing = true;
 		processingFile = file.name;
-		analysisProgress = 'Importing file...';
 
 		try {
 			const db = SingletonDatabase.getInstance();
@@ -47,8 +45,6 @@
 			// Process each accepted file
 			const fname = await client.importFile(file);
 			const columns = await client.describeColumns(fname);
-
-			analysisProgress = 'Analyzing column structure...';
 
 			// Enhanced dataset object with location recommendations
 			const dataset = {
@@ -68,8 +64,6 @@
 			// Basic location column detection
 			const locationColumns = locations.detectLocationColumns(inputColumns);
 
-			analysisProgress = 'Getting sample data for enhanced analysis...';
-
 			// Enhanced analysis with sample data for better accuracy
 			let enhancedDetections = locationColumns;
 			let sampleDataAnalyzed = false;
@@ -79,15 +73,12 @@
 				const sampleData = await client.query(`SELECT * FROM ${fname} LIMIT 5`);
 
 				if (sampleData.length > 0) {
-					analysisProgress = 'Analyzing sample data patterns...';
-					enhancedDetections = await locations.detectWithSampleData(inputColumns, sampleData);
+					enhancedDetections = locations.detectWithSampleData(inputColumns, sampleData);
 					sampleDataAnalyzed = true;
 				}
 			} catch (error) {
 				console.warn('Could not analyze sample data for location detection:', error);
 			}
-
-			analysisProgress = 'Generating coordinate suggestions...';
 
 			// Generate coordinate pair suggestions
 			const suggestedCoordinatePairs = locations.suggestCoordinatePairs(enhancedDetections);
@@ -101,12 +92,14 @@
 				fileProcessed: file.name
 			};
 
-			analysisProgress = 'Creating smart layer suggestions...';
-
 			// Auto-create a layer if we have high-confidence coordinate detection
 			const bestPair = suggestedCoordinatePairs[0];
+			console.log(bestPair);
 			if (bestPair && bestPair.confidence > 0.85) {
 				// Create a scatter layer with auto-populated coordinates
+
+				console.log('Creating scatter layer with auto-populated coordinates');
+				console.log(bestPair);
 				const autoLayer = LayerFactory.create('scatter', {
 					id: `auto-${dataset.datasetID}`,
 					props: {
@@ -118,34 +111,25 @@
 				});
 
 				layers.add(autoLayer);
-				console.log('Auto-created scatter layer with coordinates:', bestPair);
 			}
 
-			// Store detection results in inferedColumns for backward compatibility
-			inferedColumns.set({
-				datasetId: dataset.datasetID,
-				detections: enhancedDetections,
-				coordinatePairs: suggestedCoordinatePairs
+			inferedColumns.update((current) => {
+				return [
+					...current,
+					...enhancedDetections.map((detection) => ({
+						name: detection.column,
+						type: detection.type,
+						datasetId: dataset.datasetID
+					}))
+				];
 			});
 
 			// Update datasets store
 			datasets.update((current) => {
 				return [...current, dataset];
 			});
-
-			analysisProgress = 'Complete!';
-
-			// Clear processing state after a short delay
-			setTimeout(() => {
-				isProcessing = false;
-				processingFile = '';
-				analysisProgress = '';
-			}, 1000);
 		} catch (error) {
 			console.error('Error processing file:', error);
-			isProcessing = false;
-			processingFile = '';
-			analysisProgress = '';
 		}
 	}
 
@@ -194,20 +178,6 @@
 			>
 				{#if fileUpload.isDragging}
 					<p class="text-accent-400 font-medium">Drop files here</p>
-				{:else if isProcessing}
-					<div class="flex flex-col items-center gap-3">
-						<div class="flex items-center gap-2">
-							<Sparkles class="h-5 w-5 animate-pulse text-blue-500" />
-							<span class="font-medium text-gray-900 dark:text-white">Processing...</span>
-						</div>
-						<div class="text-center">
-							<p class="text-sm font-medium text-gray-700 dark:text-gray-300">{processingFile}</p>
-							<p class="text-xs text-gray-500 dark:text-gray-400">{analysisProgress}</p>
-						</div>
-						<div class="h-1 w-32 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-							<div class="h-full animate-pulse rounded-full bg-blue-500"></div>
-						</div>
-					</div>
 				{:else}
 					<div class="pointer-events-none flex flex-col items-center gap-2">
 						<UploadIcon class="text-4xl" />
@@ -236,12 +206,6 @@
 										<p class="truncate text-xs text-gray-500 dark:text-gray-400">
 											{file.type}
 										</p>
-										{#if processingFile === file.name}
-											<div class="flex items-center gap-1">
-												<Sparkles class="h-3 w-3 animate-pulse text-blue-500" />
-												<span class="text-xs text-blue-600 dark:text-blue-400">Analyzing...</span>
-											</div>
-										{/if}
 									</div>
 								</div>
 								<div class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
@@ -263,6 +227,7 @@
 				</ul>
 			{/if}
 
+			<!--
 			{#if isProcessing}
 				<div
 					class="w-[300px] rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
@@ -276,6 +241,7 @@
 					</p>
 				</div>
 			{/if}
+			-->
 		</div>
 	</Dialog.Content>
 </Dialog.Root>

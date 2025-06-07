@@ -1,36 +1,6 @@
-export interface LocationColumnDetection {
-	column: string;
-	type: LocationColumnType;
-	confidence: number;
-	suggestions?: string[];
-}
-
-export type LocationColumnType =
-	| 'latitude'
-	| 'longitude'
-	| 'address'
-	| 'city'
-	| 'state'
-	| 'country'
-	| 'postal_code'
-	| 'coordinate_pair'
-	| 'place_name'
-	| 'street'
-	| 'building'
-	| 'region';
-
-export interface LocationPattern {
-	type: LocationColumnType;
-	patterns: RegExp[];
-	confidence: number;
-	description: string;
-}
+import type { LocationColumnDetection, LocationPattern, LocationColumnType } from '$lib/types';
 
 export class LocationColumnDetector {
-	private layerType?: any;
-	constructor(layerType?: any) {
-		this.layerType = layerType;
-	}
 	private patterns: LocationPattern[] = [
 		// Latitude patterns
 		{
@@ -276,7 +246,7 @@ export class LocationColumnDetector {
 		const detections: LocationColumnDetection[] = [];
 
 		for (const column of columns) {
-			const detection = this.detectColumnType(column.name, column.type);
+			const detection = this.detectColumnType(column.name.toLowerCase(), column.type.toLowerCase());
 			if (detection) {
 				detections.push(detection);
 			}
@@ -329,10 +299,10 @@ export class LocationColumnDetector {
 	/**
 	 * Sample data to improve detection accuracy
 	 */
-	async detectWithSampleData(
+	detectWithSampleData(
 		columns: { name: string; type: string }[],
 		sampleData: Record<string, any>[]
-	): Promise<LocationColumnDetection[]> {
+	): LocationColumnDetection[] {
 		const detections = this.detectLocationColumns(columns);
 
 		// Enhance detections with sample data analysis

@@ -8,7 +8,7 @@
 	import { layers } from '$lib/io/stores';
 
 	// Import your custom RadiusMode
-	import RadiusMode from './utils/custom-draw-circle'; // Adjust path as needed
+	//import RadiusMode from './utils/custom-draw-circle'; // Adjust path as needed
 
 	let drawnFeatures = $state<any[]>([]);
 	let activeEditTool = $state('simple_select');
@@ -18,7 +18,7 @@
 	$effect(() => {
 		if ($mapInstance && $drawInstance && !isDrawing) {
 			// Register the custom circle mode
-			$drawInstance.modes.draw_circle = RadiusMode;
+			//		$drawInstance.modes.draw_circle = RadiusMode;
 
 			// Set up event handlers for draw actions
 			$mapInstance.on('draw.create', handleDrawCreate);
