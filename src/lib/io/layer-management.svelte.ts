@@ -21,7 +21,9 @@ export type LayerType = 'scatter' | 'geojson' | 'arc' | 'line' | 'path' | 'polyg
 //| 'trips';
 
 export interface LayerDef {
+	//icon: any;
 	label: string; // human‑readable
+	//title: string;
 	ctor: LayerCtor; // Deck.GL constructor
 	defaultProps: Record<string, any>; // minimal safe defaults
 }

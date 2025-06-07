@@ -1,14 +1,13 @@
 <script lang="ts">
 	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Sidebar from '$lib/components/ui/sidebar/index';
+	//import * as Sidebar from '$lib/components/ui/sidebar/index';
 
 	import ChooseLayerType from './choose-layer-type.svelte';
-	import ChooseDataset from './choose-dataset.svelte';
+	//import ChooseDataset from './choose-dataset.svelte';
 
 	import { layers } from '$lib/io/stores';
 	import { layerDefs } from '$lib/io/layer-management.svelte'; // singleton instance
 	import { X, ChevronDown } from '@lucide/svelte';
-	import { buttonVariants } from '$lib/components/ui/button';
 
 	let layertype = $state('Layer');
 	let { layer } = $props();
