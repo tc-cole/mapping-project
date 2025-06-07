@@ -11,18 +11,6 @@
 </script>
 
 <div class="app-container">
-	<!---
-	<Sidebar.Provider>
-		<AppSidebar />
-		<div class="z-10">
-			<Sidebar.Trigger
-				onclick={() => {
-					$openSidebar = !$openSidebar;
-				}}
-			/>
-		</div>
-	</Sidebar.Provider>
--->
 	<ChartsDrawer />
 
 	<DeckGL />
@@ -37,6 +25,10 @@
 	</div>
 	<div class="data-input-container">
 		<DataInput />
+	</div>
+
+	<div class="layer-selection-container">
+		<LayersSelection />
 	</div>
 </div>
 
@@ -56,9 +48,16 @@
 		transition: left 0.2s ease-out;
 	}
 
+	.layer-selection-container {
+		position: absolute;
+		top: 5rem;
+		right: 1rem;
+		z-index: 10;
+	}
+
 	.data-input-container {
 		position: absolute;
-		top: 1.5rem;
+		top: 1rem;
 		right: 1rem;
 		z-index: 10;
 	}

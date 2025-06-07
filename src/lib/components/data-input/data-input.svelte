@@ -118,14 +118,21 @@
 </script>
 
 <Dialog.Root>
-	<Dialog.Trigger class={cn(buttonVariants({ variant: 'outline' }))}>
-		{#snippet child({ props }: { props: any })}
-			<div {...props}>
-				<span>Add Dataset</span>
-				<Plus />
-			</div>
-		{/snippet}
-	</Dialog.Trigger>
+	<div class="bg-grey-800 w-full">
+		<Dialog.Trigger
+			class={cn(
+				buttonVariants({ variant: 'outline', size: 'lg' }),
+				'border-gray-600 bg-gray-800 text-lg font-medium text-gray-200 hover:bg-gray-700 hover:text-white'
+			)}
+		>
+			{#snippet child({ props }: { props: any })}
+				<div {...props}>
+					<span>Add Dataset</span>
+					<Plus />
+				</div>
+			{/snippet}
+		</Dialog.Trigger>
+	</div>
 
 	<Dialog.Content>
 		<Dialog.Header>
