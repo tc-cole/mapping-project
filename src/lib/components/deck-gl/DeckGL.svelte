@@ -8,7 +8,7 @@
 	import MapboxDraw from '@mapbox/mapbox-gl-draw';
 	import mapboxgl from 'mapbox-gl';
 	import RadiusMode from '$lib/components/drawing-tools/utils/custom-draw-circle';
-	console.log(RadiusMode);
+	//console.log(RadiusMode);
 
 	import { layers, editableGeoJSON, mapViewState } from '$lib/io/stores';
 	import { Deck, MapView } from '@deck.gl/core';
@@ -68,7 +68,6 @@
 		if (!deckInstance || !map) return;
 		try {
 			const updatedLayers = safeCreateLayers($layers);
-			console.log(updatedLayers);
 			deckInstance.setProps({
 				layers: updatedLayers
 			});

@@ -2,6 +2,7 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
+	import { GeometryFilterManager, getGeometryId } from '$lib/io/geometry-management.svelte';
 	import { chosenDataset, clickedGeoJSON, selectedGeometryId, layers } from '$lib/io/stores';
 
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -9,7 +10,6 @@
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { AlertCircle } from '@lucide/svelte';
 	import { flyTo } from './utils/flyto';
-	import { GeometryFilterManager, getGeometryId } from '$lib/io/geometry-management.svelte';
 
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
@@ -109,25 +109,6 @@
 			});
 		}
 	});
-
-	function getLocationRecommendations() {
-		if (!$chosenDataset?.locationRecommendations) {
-			return {
-				hasRecommendations: false,
-				detectedColumns: [],
-				suggestedPairs: [],
-				bestPair: null
-			};
-		}
-
-		const recommendations = $chosenDataset.locationRecommendations;
-		return {
-			hasRecommendations: true,
-			detectedColumns: recommendations.detectedColumns,
-			suggestedPairs: recommendations.suggestedCoordinatePairs,
-			bestPair: recommendations.suggestedCoordinatePairs[0] || null
-		};
-	}
 
 	$effect(() => {
 		if ($chosenDataset && !hasAppliedInference) {
@@ -252,6 +233,25 @@
 			updateOptionalProps(changedProps);
 		}
 	});
+
+	function getLocationRecommendations() {
+		if (!$chosenDataset?.locationRecommendations) {
+			return {
+				hasRecommendations: false,
+				detectedColumns: [],
+				suggestedPairs: [],
+				bestPair: null
+			};
+		}
+
+		const recommendations = $chosenDataset.locationRecommendations;
+		return {
+			hasRecommendations: true,
+			detectedColumns: recommendations.detectedColumns,
+			suggestedPairs: recommendations.suggestedCoordinatePairs,
+			bestPair: recommendations.suggestedCoordinatePairs[0] || null
+		};
+	}
 
 	// Updated createTempFilterTable function
 	async function createTempFilterTable(feature: any) {

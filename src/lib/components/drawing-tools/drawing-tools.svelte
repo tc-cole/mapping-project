@@ -267,6 +267,7 @@
 	</button>
 
 	<!-- Draw Circle Tool -->
+	<!--
 	<button
 		class={`rounded p-2 ${activeEditTool === 'draw_circle' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}
 		title="Draw Circle"
@@ -275,7 +276,7 @@
 		<Circle size={20} />
 		<span class="sr-only">Draw Circle</span>
 	</button>
-
+	-->
 	<!-- Delete Tool -->
 	<div class="mx-1 h-6 w-px bg-gray-600"></div>
 	<button
