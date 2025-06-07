@@ -1,9 +1,9 @@
 <script lang="ts">
-	import AppSidebar from '$lib/components/nav-sidebar/navigation-sidebar.svelte';
-	import DeckGL from '$lib/components/DeckGL/DeckGL.svelte';
+	import AppSidebar from '$lib/components/layers-selection/layers-selection.svelte';
+	import DeckGL from '$lib/components/deck-gl/DeckGL.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ChartsDrawer from '$lib/components/charts-drawer/charts-drawer.svelte';
-	import DrawingTools from '$lib/components/menu/DrawingTools.svelte';
+	import DrawingTools from '$lib/components/drawing-tools/drawing-tools.svelte';
 	import { openDrawer, openSidebar } from '$lib/io/stores';
 </script>
 

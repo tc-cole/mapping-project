@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { Move, Trash2, CircleDot, SplineIcon, Hexagon, Circle } from '@lucide/svelte';
 	import { clickedGeoJSON, openDrawer } from '$lib/io/stores';
-	import { mapInstance, drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
+	import { mapInstance, drawInstance } from '$lib/components/deck-gl/DeckGL.svelte';
 	import { MaskExtension } from '@deck.gl/extensions';
 
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
 	import { layers } from '$lib/io/stores';
-	
+
 	// Import your custom RadiusMode
 	import RadiusMode from './utils/custom-draw-circle'; // Adjust path as needed
 
@@ -16,10 +16,10 @@
 	let lastCompletedFeature = $state<any>(null);
 
 	$effect(() => {
-		if ($mapInstance && $drawInstance) {
+		if ($mapInstance && $drawInstance && !isDrawing) {
 			// Register the custom circle mode
 			$drawInstance.modes.draw_circle = RadiusMode;
-			
+
 			// Set up event handlers for draw actions
 			$mapInstance.on('draw.create', handleDrawCreate);
 			$mapInstance.on('draw.update', handleDrawUpdate);
@@ -54,7 +54,7 @@
 					feature.geometry.coordinates,
 					parseFloat(feature.properties.radius) / 1000 // Convert meters to km
 				);
-				
+
 				return {
 					...feature,
 					geometry: circlePolygon.geometry,
@@ -123,6 +123,7 @@
 					onDrawingComplete(inProgressFeature);
 				}
 			}
+			isDrawing = false;
 		}
 	}
 
