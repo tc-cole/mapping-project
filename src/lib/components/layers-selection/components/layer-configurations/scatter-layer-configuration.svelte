@@ -1,19 +1,22 @@
 <script lang="ts">
+	// IO imports
+	import { chosenDataset, clickedGeoJSON, selectedGeometryId, layers } from '$lib/io/stores';
+	import { GeometryFilterManager, getGeometryId } from '$lib/io/geometry-management.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
-	import { GeometryFilterManager, getGeometryId } from '$lib/io/geometry-management.svelte';
-	import { chosenDataset, clickedGeoJSON, selectedGeometryId, layers } from '$lib/io/stores';
-
-	import { Label } from '$lib/components/ui/label/index.js';
-	import { Slider } from '$lib/components/ui/slider/index.js';
-	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
-	import { AlertCircle } from '@lucide/svelte';
 	import { flyTo } from './utils/flyto';
 
+	// UI imports
+	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
+	import { Slider } from '$lib/components/ui/slider/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { AlertCircle } from '@lucide/svelte';
+
+	// Component imports
 	import ColumnDropdown from './utils/column-dropdown.svelte';
-	import Sectional from './utils/sectional.svelte';
 	import ConfigField from './utils/config-field.svelte';
+	import Sectional from './utils/sectional.svelte';
 
 	//import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
 
@@ -68,10 +71,6 @@
 	}
 
 	let hasAppliedInference = $state(false);
-	let showInferenceBanner = $state(false);
-	let inferredPair = $state<{ latitude: string; longitude: string; confidence: number } | null>(
-		null
-	);
 
 	$effect(() => {
 		if (!requiredColumnsSelected) return;
@@ -89,7 +88,7 @@
 			// Create or get existing filter table
 			createTempFilterTable($clickedGeoJSON).then((filterInfo) => {
 				if (filterInfo) {
-					console.log(`Geometry ${geometryId} mapped to table: ${filterInfo.tableName}`);
+					//console.log(`Geometry ${geometryId} mapped to table: ${filterInfo.tableName}`);
 
 					// Update layer with filtered data from the table
 					layers.updateProps(layer.id, {
@@ -122,18 +121,6 @@
 					latitudeColumn = bestPair.latitude;
 					longitudeColumn = bestPair.longitude;
 					hasAppliedInference = true;
-
-					console.log('🎯 Auto-applied inferred coordinates:', {
-						latitude: bestPair.latitude,
-						longitude: bestPair.longitude,
-						confidence: Math.round(bestPair.confidence * 100) + '%',
-						dataset: $chosenDataset.datasetName
-					});
-				}
-				// Show banner for lower confidence suggestions
-				else if (bestPair.confidence > 0.5) {
-					inferredPair = bestPair;
-					showInferenceBanner = true;
 				}
 			}
 		}
@@ -594,7 +581,7 @@
 
 			const columnsStr = columns.join(', ');
 
-			console.log(`Loading data from filter table: ${tableName}`);
+			//console.log(`Loading data from filter table: ${tableName}`);
 
 			// Query the pre-filtered table instead of doing spatial filtering again
 			const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${tableName}`);

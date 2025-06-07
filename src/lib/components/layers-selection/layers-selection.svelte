@@ -3,7 +3,6 @@
 	import SidebarLayerEditor from './components/layer-editor.svelte';
 	//import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import AddDataset from './components/add-dataset.svelte';
 	import { layers } from '$lib/io/stores';
 
 	function addLayer() {
@@ -13,8 +12,6 @@
 
 <Sidebar.Root side="right" variant="floating" class="h-1/2">
 	<Sidebar.Content class="h-1/2">
-		<AddDataset />
-		<Sidebar.Separator></Sidebar.Separator>
 		<!--
 
 		<Sidebar.Group class="-px-4">

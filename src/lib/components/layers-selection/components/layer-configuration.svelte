@@ -1,12 +1,12 @@
 <script lang="ts">
-	import ScatterLayer from './layers/scatter-layer-configuration.svelte';
-	import PolygonLayer from './layers/polygon-layer-configuration.svelte';
+	import ScatterLayer from './layer-configurations/scatter-layer-configuration.svelte';
+	import PolygonLayer from './layer-configurations/polygon-layer-configuration.svelte';
 	//import TripsLayer from './layers/trips-layer.svelte';
-	import LineLayer from './layers/line-layer-configuration.svelte';
-	import ArcLayer from './layers/arc-layer-configuration.svelte';
-	import H3Layer from './layers/h3-layer-configuration.svelte';
+	import LineLayer from './layer-configurations/line-layer-configuration.svelte';
+	import ArcLayer from './layer-configurations/arc-layer-configuration.svelte';
+	import H3Layer from './layer-configurations/h3-layer-configuration.svelte';
 	import { layerDefs } from '$lib/io/layer-management.svelte'; // singleton instance
-	import GeoJSONLayer from './layers/geojson-layer-configuration.svelte';
+	import GeoJSONLayer from './layer-configurations/geojson-layer-configuration.svelte';
 
 	let { layertype, layer } = $props();
 </script>

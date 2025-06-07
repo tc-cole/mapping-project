@@ -95,11 +95,13 @@
 			// Auto-create a layer if we have high-confidence coordinate detection
 			const bestPair = suggestedCoordinatePairs[0];
 			console.log(bestPair);
-			if (bestPair && bestPair.confidence > 0.85) {
+			if (bestPair && bestPair.confidence > 0.75) {
 				// Create a scatter layer with auto-populated coordinates
 
 				console.log('Creating scatter layer with auto-populated coordinates');
 				console.log(bestPair);
+
+				/*
 				const autoLayer = LayerFactory.create('scatter', {
 					id: `auto-${dataset.datasetID}`,
 					props: {
@@ -111,6 +113,7 @@
 				});
 
 				layers.add(autoLayer);
+				*/
 			}
 
 			inferedColumns.update((current) => {
