@@ -1,12 +1,13 @@
 <script lang="ts">
-	import AppSidebar from '$lib/components/layers-selection/layers-selection.svelte';
+	//import AppSidebar from '$lib/components/layers-selection/layers-selection.svelte';
 	import DeckGL from '$lib/components/deck-gl/DeckGL.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	//import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ChartsDrawer from '$lib/components/charts-drawer/charts-drawer.svelte';
 	import DrawingTools from '$lib/components/drawing-tools/drawing-tools.svelte';
 	import { openDrawer, openSidebar } from '$lib/io/stores';
 	import DataInput from '$lib/components/data-input/data-input.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import LayersSelection from '$lib/components/layers-selection/layers-selection.svelte';
+	//import { Button } from '$lib/components/ui/button/index.js';
 </script>
 
 <div class="app-container">
@@ -32,9 +33,10 @@
 		class:sidebar-open={$openSidebar}
 		class:drawer-open={$openDrawer}
 	>
-		<DataInput />
-
 		<DrawingTools />
+	</div>
+	<div class="data-input-container">
+		<DataInput />
 	</div>
 </div>
 
@@ -52,6 +54,13 @@
 		transform: translateX(-50%);
 		z-index: 10;
 		transition: left 0.2s ease-out;
+	}
+
+	.data-input-container {
+		position: absolute;
+		top: 1.5rem;
+		right: 1rem;
+		z-index: 10;
 	}
 
 	/* When sidebar is open, adjust the position */

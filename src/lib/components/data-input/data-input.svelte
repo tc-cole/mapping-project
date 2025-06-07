@@ -9,8 +9,6 @@
 	import { LocationColumnDetector } from '$lib/io/location-detector';
 	import { UploadIcon, X, Plus, Sparkles } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { LayerFactory } from '$lib/io/layer-management.svelte';
-	import { layers, inferedColumns } from '$lib/io/stores';
 	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils';
 
@@ -92,40 +90,7 @@
 				fileProcessed: file.name
 			};
 
-			// Auto-create a layer if we have high-confidence coordinate detection
-			const bestPair = suggestedCoordinatePairs[0];
-			console.log(bestPair);
-			if (bestPair && bestPair.confidence > 0.75) {
-				// Create a scatter layer with auto-populated coordinates
-
-				console.log('Creating scatter layer with auto-populated coordinates');
-				console.log(bestPair);
-
-				/*
-				const autoLayer = LayerFactory.create('scatter', {
-					id: `auto-${dataset.datasetID}`,
-					props: {
-						// These will be auto-filled when the layer component detects the dataset
-						autoSuggestedLat: bestPair.latitude,
-						autoSuggestedLng: bestPair.longitude,
-						datasetId: dataset.datasetID
-					}
-				});
-
-				layers.add(autoLayer);
-				*/
-			}
-
-			inferedColumns.update((current) => {
-				return [
-					...current,
-					...enhancedDetections.map((detection) => ({
-						name: detection.column,
-						type: detection.type,
-						datasetId: dataset.datasetID
-					}))
-				];
-			});
+			// Auto-create a layer if we have high-confidence coordinate detection			const bestPair = suggestedCoordinatePairs[0];
 
 			// Update datasets store
 			datasets.update((current) => {
@@ -153,14 +118,15 @@
 </script>
 
 <Dialog.Root>
-	<Dialog.Trigger>
+	<Dialog.Trigger class={cn(buttonVariants({ variant: 'outline' }))}>
 		{#snippet child({ props }: { props: any })}
-			<div class={cn(buttonVariants({ variant: 'outline' }), { ...props.class })}>
-				<span {...props}>Add Dataset</span>
-				<Plus {...props} />
+			<div {...props}>
+				<span>Add Dataset</span>
+				<Plus />
 			</div>
 		{/snippet}
 	</Dialog.Trigger>
+
 	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title>Upload Dataset</Dialog.Title>

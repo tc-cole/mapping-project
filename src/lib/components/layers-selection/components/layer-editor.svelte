@@ -28,27 +28,20 @@
 <Collapsible.Root>
 	<Collapsible.Trigger class="flex w-full items-center gap-2 px-4 py-3 hover:bg-muted/50">
 		{#snippet child({ props })}
-			<Sidebar.MenuButton {...props} class={buttonVariants({ variant: 'secondary' })}>
-				<span class="flex-1 truncate">{layertype}</span>
+			<span class="flex-1 truncate">{layertype}</span>
 
-				<!--<Switch checked={layer.props.visible ?? true} onchange={(e) => update({ visible: e.detail })} /> -->
-				<button class="p-1 text-muted-foreground hover:text-destructive" onclick={remove}>
-					<X size={16} />
-				</button>
-				<ChevronDown
-					class="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180"
-				/>
-			</Sidebar.MenuButton>
+			<!--<Switch checked={layer.props.visible ?? true} onchange={(e) => update({ visible: e.detail })} /> -->
+			<button class="p-1 text-muted-foreground hover:text-destructive" onclick={remove}>
+				<X size={16} />
+			</button>
+			<ChevronDown
+				class="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180"
+			/>
 		{/snippet}
 	</Collapsible.Trigger>
 
 	<!-- body -->
 	<Collapsible.Content class="px-2 pb-4">
-		<Sidebar.MenuItem class="py-2">
-			<ChooseDataset />
-		</Sidebar.MenuItem>
-		<Sidebar.MenuItem>
-			<ChooseLayerType {layer} />
-		</Sidebar.MenuItem>
+		<ChooseLayerType {layer} />
 	</Collapsible.Content>
 </Collapsible.Root>

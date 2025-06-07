@@ -18,8 +18,6 @@
 	import ConfigField from './utils/config-field.svelte';
 	import Sectional from './utils/sectional.svelte';
 
-	//import { drawInstance } from '$lib/components/DeckGL/DeckGL.svelte';
-
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
 	let sizeColumn = $state<string | null>(null);
