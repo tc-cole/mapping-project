@@ -1,13 +1,10 @@
 <script lang="ts">
 	import * as Collapsible from '$lib/components/ui/collapsible';
-	//import * as Sidebar from '$lib/components/ui/sidebar/index';
-
-	import ChooseLayerType from './choose-layer-type.svelte';
-	//import ChooseDataset from './choose-dataset.svelte';
 
 	import { layers } from '$lib/io/stores';
 	import { layerDefs } from '$lib/io/layer-management.svelte'; // singleton instance
 	import { X, ChevronDown } from '@lucide/svelte';
+	import ScatterLayerConfiguration from './layer-configurations/scatter-layer-configuration.svelte';
 
 	let layertype = $state('Layer');
 	let { layer } = $props();
@@ -41,6 +38,6 @@
 
 	<!-- body -->
 	<Collapsible.Content class="px-2 pb-4">
-		<ChooseLayerType {layer} />
+		<ScatterLayerConfiguration {layer} />
 	</Collapsible.Content>
 </Collapsible.Root>

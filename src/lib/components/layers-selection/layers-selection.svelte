@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SidebarLayerEditor from './components/layer-editor.svelte';
+	import LayerEditor from './components/layer-editor.svelte';
 	import { layers } from '$lib/io/stores';
 	import { layerDefs } from '$lib/io/layer-management.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
@@ -33,15 +33,6 @@
 				visible: !(layer.props.visible ?? true)
 			});
 		}
-	}
-
-	function getObjectCount(layer: any): string {
-		// This would need to be implemented based on your data structure
-		// For now, returning a placeholder
-		if (layer.props.data && Array.isArray(layer.props.data)) {
-			return `${layer.props.data.length} objects`;
-		}
-		return 'Loading...';
 	}
 </script>
 
@@ -119,7 +110,7 @@
 
 								<!-- Expandable layer editor -->
 								<div class="mt-3">
-									<SidebarLayerEditor {layer} />
+									<LayerEditor {layer} />
 								</div>
 							</div>
 						{/each}
