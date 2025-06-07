@@ -5,9 +5,12 @@
 	import ChartsDrawer from '$lib/components/charts-drawer/charts-drawer.svelte';
 	import DrawingTools from '$lib/components/drawing-tools/drawing-tools.svelte';
 	import { openDrawer, openSidebar } from '$lib/io/stores';
+	import DataInput from '$lib/components/data-input/data-input.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 </script>
 
 <div class="app-container">
+	<!---
 	<Sidebar.Provider>
 		<AppSidebar />
 		<div class="z-10">
@@ -18,7 +21,7 @@
 			/>
 		</div>
 	</Sidebar.Provider>
-
+-->
 	<ChartsDrawer />
 
 	<DeckGL />
@@ -29,6 +32,8 @@
 		class:sidebar-open={$openSidebar}
 		class:drawer-open={$openDrawer}
 	>
+		<DataInput />
+
 		<DrawingTools />
 	</div>
 </div>

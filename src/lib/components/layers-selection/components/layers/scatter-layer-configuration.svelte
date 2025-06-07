@@ -26,6 +26,7 @@
 	let pointRadius = $state<number>(10);
 	let minPointRadius = $state<number>(1);
 	let maxPointRadius = $state<number>(100);
+
 	let opacity = $state<number>(0.8);
 	let colorScale = $state<string>('viridis');
 	let showLabels = $state<boolean>(false);
@@ -58,6 +59,13 @@
 	let requiredColumnsSelected = $derived(
 		latitudeColumn !== undefined && longitudeColumn !== undefined
 	);
+	// Define the Point type for clarity
+	interface Point {
+		position: [number, number];
+		size: number;
+		color: number | null;
+		label: string | null;
+	}
 
 	$effect(() => {
 		if (!requiredColumnsSelected) return;
@@ -361,14 +369,6 @@
 				yield [];
 			}
 		}
-	}
-
-	// Define the Point type for clarity
-	interface Point {
-		position: [number, number];
-		size: number;
-		color: number | null;
-		label: string | null;
 	}
 
 	// Create a scatter layer when required columns are selected

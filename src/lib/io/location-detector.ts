@@ -27,6 +27,10 @@ export interface LocationPattern {
 }
 
 export class LocationColumnDetector {
+	private layerType?: any;
+	constructor(layerType?: any) {
+		this.layerType = layerType;
+	}
 	private patterns: LocationPattern[] = [
 		// Latitude patterns
 		{

@@ -43,3 +43,11 @@ export const mapViewState = writable<MapViewState>({
 	pitch: 0,
 	bearing: 0
 });
+
+export interface InferedColumn {
+	name: string;
+	type: string;
+	datasetId: string;
+}
+
+export const inferedColumns = writable<InferedColumn[]>([]);
