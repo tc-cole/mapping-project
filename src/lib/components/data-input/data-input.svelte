@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { datasets } from '$lib/io/stores';
+	import type { Dataset } from '$lib/types'; // Import the Dataset type
 
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
@@ -7,7 +8,7 @@
 
 	import { FileUpload, type FileUploadError } from 'melt/builders';
 	import { LocationColumnDetector } from '$lib/io/location-detector';
-	import { UploadIcon, X, Plus, Sparkles } from '@lucide/svelte';
+	import { UploadIcon, X, Plus, Sparkles, FileIcon } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils';
@@ -40,57 +41,86 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			// Process each accepted file
-			const fname = await client.importFile(file);
-			const columns = await client.describeColumns(fname);
+			// Import file into DuckDB
+			const tableName = await client.importFile(file);
+			const columns = await client.describeColumns(tableName);
+			const stats = await client.tableStats(tableName);
 
-			// Enhanced dataset object with location recommendations
-			const dataset = {
+			// Determine file type
+			const fileExtension = file.name.split('.').pop()?.toLowerCase();
+			const isGeographic = ['geojson', 'shp', 'kml'].includes(fileExtension || '');
+
+			// Create base dataset following new interface
+			const dataset: Dataset = {
+				// Core Identity
 				datasetID: generateID(),
+				datasetLabel: file.name.replace(/\.[^/.]+$/, ''), // Remove extension for label
+				datasetType: 'file',
+				datasetName: tableName,
+				layerID: crypto.randomUUID?.() ?? `id-${Date.now()}`,
+
+				// Schema & Structure
 				schema: columns,
-				datasetName: fname,
-				locationRecommendations: undefined as any // Will be filled below
+				rowCount: stats.rowCount,
+				fileSize: file.size,
+
+				// Source Information
+				source: {
+					type: 'file',
+					originalFilename: file.name,
+					fileType: fileExtension || 'unknown',
+					uploadedAt: new Date(),
+					fileHandle: file,
+					importOptions: {} // Could store CSV delimiter, etc.
+				},
+
+				// Processing Status
+				status: {
+					state: 'processing',
+					progress: 50,
+					message: 'Analyzing data structure...'
+				},
+
+				// UI Metadata
+				icon: FileIcon,
+				color: getFileTypeColor(fileExtension || ''),
+				tags: [fileExtension || 'unknown'],
+
+				// Timestamps
+				createdAt: new Date(),
+				updatedAt: new Date(),
+
+				// Performance & Indexing
+				indexed: {
+					spatialIndex: false,
+					columnIndexes: [],
+					optimized: false
+				},
+
+				// Statistics
+				statistics: {
+					rowCount: stats.rowCount,
+					columnCount: columns.length,
+					nullCounts: {}, // Could be calculated
+					uniqueCounts: {} // Could be calculated
+				}
 			};
 
-			const locations = new LocationColumnDetector();
-
-			const inputColumns = dataset.schema.map((c) => ({
-				name: c.name,
-				type: c.type
-			}));
-
-			// Basic location column detection
-			const locationColumns = locations.detectLocationColumns(inputColumns);
-
-			// Enhanced analysis with sample data for better accuracy
-			let enhancedDetections = locationColumns;
-			let sampleDataAnalyzed = false;
-
-			try {
-				// Get sample data for more accurate detection
-				const sampleData = await client.query(`SELECT * FROM ${fname} LIMIT 5`);
-
-				if (sampleData.length > 0) {
-					enhancedDetections = locations.detectWithSampleData(inputColumns, sampleData);
-					sampleDataAnalyzed = true;
-				}
-			} catch (error) {
-				console.warn('Could not analyze sample data for location detection:', error);
+			// Add location-specific metadata for geographic files or detected coordinate data
+			if (isGeographic) {
+				// For geographic files, handle as geometry data
+				await handleGeographicFile(dataset, client, tableName);
+			} else {
+				// For tabular data, detect location columns
+				await detectLocationColumns(dataset, client, tableName, file.name);
 			}
 
-			// Generate coordinate pair suggestions
-			const suggestedCoordinatePairs = locations.suggestCoordinatePairs(enhancedDetections);
-
-			// Store location recommendations in dataset
-			dataset.locationRecommendations = {
-				detectedColumns: enhancedDetections,
-				suggestedCoordinatePairs,
-				analyzedAt: new Date(),
-				sampleDataAnalyzed,
-				fileProcessed: file.name
+			// Final status update
+			dataset.status = {
+				state: 'ready',
+				progress: 100,
+				message: 'Dataset ready for use'
 			};
-
-			// Auto-create a layer if we have high-confidence coordinate detection			const bestPair = suggestedCoordinatePairs[0];
 
 			// Update datasets store
 			datasets.update((current) => {
@@ -98,7 +128,167 @@
 			});
 		} catch (error) {
 			console.error('Error processing file:', error);
+
+			// Create error dataset entry
+			const errorDataset: Dataset = {
+				datasetID: generateID(),
+				datasetLabel: file.name,
+				datasetType: 'file',
+				datasetName: file.name,
+				layerID: crypto.randomUUID?.() ?? `id-${Date.now()}`,
+
+				schema: [],
+				source: {
+					type: 'file',
+					originalFilename: file.name,
+					fileType: file.name.split('.').pop() || 'unknown',
+					uploadedAt: new Date(),
+					fileHandle: file
+				},
+				status: {
+					state: 'error',
+					message: `Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`,
+					errors: [
+						{
+							code: 'PROCESSING_ERROR',
+							message: error instanceof Error ? error.message : 'Unknown error',
+							severity: 'error'
+						}
+					]
+				},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			datasets.update((current) => [...current, errorDataset]);
+		} finally {
+			isProcessing = false;
+			processingFile = '';
 		}
+	}
+
+	async function detectLocationColumns(
+		dataset: Dataset,
+		client: any,
+		tableName: string,
+		filename: string
+	) {
+		const locations = new LocationColumnDetector();
+
+		const inputColumns = dataset.schema.map((c: { name: string; type: string }) => ({
+			name: c.name,
+			type: c.type
+		}));
+
+		// Basic location column detection
+		let locationColumns = locations.detectLocationColumns(inputColumns);
+		let sampleDataAnalyzed = false;
+
+		try {
+			// Get sample data for more accurate detection
+			const sampleData = await client.query(`SELECT * FROM ${tableName} LIMIT 5`);
+
+			if (sampleData.length > 0) {
+				locationColumns = locations.detectWithSampleData(inputColumns, sampleData);
+				sampleDataAnalyzed = true;
+			}
+		} catch (error) {
+			console.warn('Could not analyze sample data for location detection:', error);
+		}
+
+		// Generate coordinate pair suggestions
+		const suggestedCoordinatePairs = locations.suggestCoordinatePairs(locationColumns);
+
+		// Add location metadata if location columns detected
+		if (locationColumns.length > 0) {
+			dataset.metadata = {
+				location: {
+					recommendations: {
+						detectedColumns: locationColumns,
+						suggestedCoordinatePairs,
+						analyzedAt: new Date(),
+						sampleDataAnalyzed,
+						fileProcessed: filename
+					},
+					chosenColumns: {
+						// Initialize with best suggestions if confidence is high
+						...(suggestedCoordinatePairs[0]?.confidence > 0.8 && {
+							latitude: suggestedCoordinatePairs[0].latitude,
+							longitude: suggestedCoordinatePairs[0].longitude
+						})
+					}
+				}
+			};
+
+			// Update tags to include geographic info
+			dataset.tags = [...(dataset.tags || []), 'geographic'];
+		}
+	}
+
+	async function handleGeographicFile(dataset: Dataset, client: any, tableName: string) {
+		try {
+			// For GeoJSON/Shapefile, detect geometry columns and bounds
+			const geomSample = await client.query(`SELECT * FROM ${tableName} LIMIT 1`);
+
+			if (geomSample.length > 0) {
+				// Find geometry column (could be 'geometry', 'geom', or similar)
+				const geomColumn = dataset.schema.find(
+					(col) =>
+						col.name.toLowerCase().includes('geom') ||
+						col.databaseType.toLowerCase().includes('geometry')
+				);
+
+				if (geomColumn) {
+					dataset.metadata = {
+						geometry: {
+							geometryId: generateID(),
+							shape: {
+								type: 'Polygon', // Default, should be detected from actual data
+								featureCount: dataset.rowCount || 0,
+								bounds: {
+									north: 0,
+									south: 0,
+									east: 0,
+									west: 0 // Should calculate from data
+								}
+							},
+							drawingContext: {
+								tool: 'polygon', // Will vary based on geometry type
+								createdBy: 'import'
+							},
+							properties: {
+								hasZ: false,
+								hasM: false,
+								coordinateCount: 0 // Should calculate from data
+							},
+							usage: {
+								usedAsFilter: false,
+								usedAsMask: false,
+								linkedLayerIds: []
+							}
+						}
+					};
+
+					// Update tags
+					dataset.tags = [...(dataset.tags || []), 'geometry', 'vector'];
+				}
+			}
+		} catch (error) {
+			console.warn('Could not analyze geographic data:', error);
+		}
+	}
+
+	function getFileTypeColor(fileType: string): string {
+		const colorMap: Record<string, string> = {
+			csv: '#10b981', // green
+			json: '#f59e0b', // amber
+			geojson: '#3b82f6', // blue
+			parquet: '#8b5cf6', // violet
+			shp: '#06b6d4', // cyan
+			xlsx: '#10b981', // green
+			default: '#6b7280' // gray
+		};
+		return colorMap[fileType] || colorMap.default;
 	}
 
 	const files = $derived.by(() => {
@@ -182,6 +372,12 @@
 										<p class="truncate text-xs text-gray-500 dark:text-gray-400">
 											{file.type}
 										</p>
+										{#if isProcessing && processingFile === file.name}
+											<div class="flex items-center gap-1">
+												<Sparkles class="h-3 w-3 animate-pulse text-blue-500" />
+												<span class="text-xs text-blue-600">Analyzing...</span>
+											</div>
+										{/if}
 									</div>
 								</div>
 								<div class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
@@ -203,21 +399,19 @@
 				</ul>
 			{/if}
 
-			<!--
 			{#if isProcessing}
 				<div
 					class="w-[300px] rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
 				>
 					<div class="flex items-center gap-2 text-sm">
-						<Sparkles class="h-4 w-4 text-blue-600" />
+						<Sparkles class="h-4 w-4 animate-pulse text-blue-600" />
 						<span class="font-medium text-blue-900 dark:text-blue-100">Smart Analysis Active</span>
 					</div>
 					<p class="mt-1 text-xs text-blue-700 dark:text-blue-300">
-						Detecting location columns and suggesting coordinate pairs...
+						Detecting location columns and analyzing data structure for "{processingFile}"...
 					</p>
 				</div>
 			{/if}
-			-->
 		</div>
 	</Dialog.Content>
 </Dialog.Root>

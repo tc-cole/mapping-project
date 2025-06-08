@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
-	import { chosenDataset, layers } from '$lib/io/stores';
+	import { layers } from '$lib/io/stores';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
@@ -34,7 +34,7 @@
 	let dataLoaded = $state(false);
 	let valueRange = $state<[number, number]>([0, 1]);
 
-	let { layer } = $props();
+	let { layer, dataset } = $props();
 
 	// Available color scales (matching other layers for consistency)
 	const colorScales = [
@@ -280,8 +280,8 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+			if (dataset !== null) {
+				var filename = checkNameForSpacesAndHyphens(dataset.datasetName);
 
 				// Main query with H3 and value columns
 				const query = `SELECT ${h3Column}, ${valueColumn} FROM ${filename}`;
@@ -442,8 +442,13 @@
 </script>
 
 <Sectional label="Column Selection">
-	<ColumnDropdown bind:chosenColumn={h3Column} default_column="H3" />
-	<ColumnDropdown bind:chosenColumn={valueColumn} default_column="Value" />
+	<ColumnDropdown {dataset} bind:chosenColumn={h3Column} default_column="H3" placeholder="H3" />
+	<ColumnDropdown
+		{dataset}
+		bind:chosenColumn={valueColumn}
+		default_column="Value"
+		placeholder="Column"
+	/>
 </Sectional>
 
 <Sectional label="Color Settings">

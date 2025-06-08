@@ -1,11 +1,12 @@
 <script lang="ts">
 	// IO imports
-	import { chosenDataset, clickedGeoJSON, selectedGeometryId, layers } from '$lib/io/stores';
+	import { clickedGeoJSON, selectedGeometryId, layers } from '$lib/io/stores';
 	import { GeometryFilterManager, getGeometryId } from '$lib/io/geometry-management.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
 	import { flyTo } from './utils/flyto';
+	import type { Dataset } from '$lib/types';
 
 	// UI imports
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
@@ -46,7 +47,7 @@
 		'purples'
 	];
 
-	let { layer } = $props();
+	let { dataset }: { dataset: Dataset } = $props<{ dataset: Dataset }>();
 
 	// Used to store pre-calculated values for size and color ranges
 	let sizeRange = [0, 1];
@@ -89,7 +90,7 @@
 					//console.log(`Geometry ${geometryId} mapped to table: ${filterInfo.tableName}`);
 
 					// Update layer with filtered data from the table
-					layers.updateProps(layer.id, {
+					layers.updateProps(dataset.datasetID, {
 						data: loadDataFromTable(filterInfo.tableName)
 					});
 				}
@@ -101,15 +102,16 @@
 			selectedGeometryId.set(null);
 
 			// Return to original data
-			layers.updateProps(layer.id, {
+			layers.updateProps(dataset.datasetID, {
 				data: loadData()
 			});
 		}
 	});
 
 	$effect(() => {
-		if ($chosenDataset && !hasAppliedInference) {
+		if (dataset && !hasAppliedInference) {
 			const recommendations = getLocationRecommendations();
+			if (!recommendations) return;
 
 			if (recommendations.hasRecommendations && recommendations.bestPair) {
 				const bestPair = recommendations.bestPair;
@@ -137,7 +139,7 @@
 			return;
 		}
 
-		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+		const currentLayer = layers.snapshot.find((l) => l.id === dataset.datasetID);
 
 		if (
 			currentLayer &&
@@ -220,7 +222,7 @@
 	});
 
 	function getLocationRecommendations() {
-		if (!$chosenDataset?.locationRecommendations) {
+		if (dataset.metadata?.location?.recommendations) {
 			return {
 				hasRecommendations: false,
 				detectedColumns: [],
@@ -229,7 +231,8 @@
 			};
 		}
 
-		const recommendations = $chosenDataset.locationRecommendations;
+		const recommendations = dataset.metadata?.location?.recommendations;
+		if (!recommendations) return;
 		return {
 			hasRecommendations: true,
 			detectedColumns: recommendations.detectedColumns,
@@ -256,12 +259,12 @@
 				console.log('Spatial extension handling:', e);
 			}
 
-			if ($chosenDataset === null) {
+			if (dataset === null) {
 				console.error('No dataset selected');
 				return null;
 			}
 
-			const sourceTable = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+			const sourceTable = checkNameForSpacesAndHyphens(dataset.datasetName);
 
 			// Build columns array
 			if (!latitudeColumn || !longitudeColumn) return;
@@ -448,14 +451,14 @@
 			};
 
 			// First check if a layer with this ID already exists (cleanup)
-			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const existingLayer = layers.snapshot.find((l) => l.id === dataset.datasetID);
 			if (existingLayer) {
-				console.log(`Removing existing layer with ID: ${layer.id}`);
-				layers.remove(layer.id);
+				console.log(`Removing existing layer with ID: ${dataset.datasetID}`);
+				layers.remove(dataset.datasetID);
 			}
 
 			const newScatterLayer = LayerFactory.create('scatter', {
-				id: layer.id,
+				id: dataset.datasetID,
 				props: layerProps
 			});
 
@@ -469,9 +472,9 @@
 	function updateOptionalProps(changedProps: Record<string, any>) {
 		try {
 			// Find the current layer
-			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const currentLayer = layers.snapshot.find((l) => l.id === dataset.datasetID);
 			if (!currentLayer) {
-				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				console.warn(`Cannot update layer with ID: ${dataset.datasetID} - layer not found`);
 				return;
 			}
 
@@ -531,7 +534,7 @@
 				updateObj.data = loadData();
 			}
 
-			layers.updateProps(layer.id, updateObj);
+			layers.updateProps(dataset.datasetID, updateObj);
 		} catch (error) {
 			//@ts-expect-error
 			console.error('Error updating scatter layer props:', error, error.stack);
@@ -601,8 +604,8 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+			if (dataset !== null) {
+				var filename = checkNameForSpacesAndHyphens(dataset.source.type.originalFilename);
 
 				// Build column list for query
 				const columns = [latitudeColumn, longitudeColumn];
@@ -659,6 +662,7 @@
 	<Sectional label="Coordinates" defaultOpen={true}>
 		<ConfigField label="Latitude">
 			<ColumnDropdown
+				{dataset}
 				bind:chosenColumn={latitudeColumn}
 				default_column="Latitude"
 				placeholder="Select latitude column"
@@ -667,6 +671,7 @@
 
 		<ConfigField label="Longitude">
 			<ColumnDropdown
+				{dataset}
 				bind:chosenColumn={longitudeColumn}
 				default_column="Longitude"
 				placeholder="Select longitude column"
@@ -703,6 +708,7 @@
 	<Sectional label="Data Encoding" defaultOpen={false}>
 		<ConfigField label="Size Column">
 			<ColumnDropdown
+				{dataset}
 				bind:chosenColumn={sizeColumn}
 				default_column="Size"
 				placeholder="Fixed size"
@@ -711,7 +717,7 @@
 
 		{#if sizeColumn}
 			<div class="space-y-3 border-l-2 border-border/30 pl-4">
-				<ConfigField label="Min Size" value="{minPointRadius}px">
+				<ConfigField label="Min Size" value={minPointRadius}>
 					<Slider
 						type="single"
 						value={minPointRadius}
@@ -723,7 +729,7 @@
 					/>
 				</ConfigField>
 
-				<ConfigField label="Max Size" value="{maxPointRadius}px">
+				<ConfigField label="Max Size" value={maxPointRadius}>
 					<Slider
 						type="single"
 						value={maxPointRadius}
@@ -739,6 +745,7 @@
 
 		<ConfigField label="Color Column">
 			<ColumnDropdown
+				{dataset}
 				bind:chosenColumn={colorColumn}
 				default_column="Color"
 				placeholder="Fixed color"
@@ -762,6 +769,7 @@
 	<Sectional label="Labels" defaultOpen={false}>
 		<ConfigField label="Label Column">
 			<ColumnDropdown
+				{dataset}
 				bind:chosenColumn={labelColumn}
 				default_column="Label"
 				placeholder="No labels"

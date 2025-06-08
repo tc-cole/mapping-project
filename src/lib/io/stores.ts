@@ -5,7 +5,6 @@ import { type MapViewState } from '@deck.gl/core';
 import type { Dataset, FilterTableInfo } from '$lib/types';
 
 export const datasets = writable<Dataset[]>(storeFromLocalStorage('datasets', []));
-export const chosenDataset = writable<Dataset | null>(storeFromLocalStorage('chosenDataset', null));
 
 export const layers = new LayerStore();
 export const mapboxDrawInstance = writable<any>();

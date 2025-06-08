@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
-	import { chosenDataset, layers } from '$lib/io/stores';
+	import { layers } from '$lib/io/stores';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import Sectional from './utils/sectional.svelte';
@@ -11,6 +11,7 @@
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { AlertCircle } from '@lucide/svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import type { Dataset } from '$lib/types';
 
 	// Source coordinates
 	let fromLatitude = $state<string | undefined>();
@@ -77,7 +78,7 @@
 		'purples'
 	];
 
-	let { layer } = $props();
+	let { dataset } = $props<{ dataset: Dataset }>();
 
 	// Used to store pre-calculated values for width and color ranges
 	let widthRange = $state([0, 1]);
@@ -104,7 +105,7 @@
 			return;
 		}
 
-		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+		const currentLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 
 		if (
 			currentLayer &&
@@ -247,17 +248,6 @@
 	}
 
 	async function* transformRows(rows: AsyncIterable<any[]>): AsyncGenerator<any[], void, unknown> {
-		console.log('==================== ARC TRANSFORM START ====================');
-		console.log('Starting arc transformRows with columns:', {
-			fromLat: fromLatitude,
-			fromLng: fromLongitude,
-			toLat: toLatitude,
-			toLng: toLongitude,
-			width: widthColumn,
-			color: colorColumn,
-			label: labelColumn
-		});
-
 		let allArcs: any[] = [];
 		let widthValues: number[] = [];
 		let colorValues: number[] = [];
@@ -443,8 +433,8 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.filename);
+			if (dataset !== null) {
+				var filename = checkNameForSpacesAndHyphens(dataset.filename);
 
 				const columns = [fromLatitude, fromLongitude, toLatitude, toLongitude];
 				if (widthColumn) columns.push(widthColumn);
@@ -524,13 +514,13 @@
 				labelColumn: labelColumn
 			};
 
-			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const existingLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 			if (existingLayer) {
-				layers.remove(layer.id);
+				layers.remove(dataset.layerID);
 			}
 
 			const newArcLayer = LayerFactory.create('arc', {
-				id: layer.id,
+				id: dataset.layerID,
 				props: layerProps
 			});
 
@@ -543,7 +533,7 @@
 	// Update layer props
 	function updateOptionalProps(changedProps: Record<string, any>): void {
 		try {
-			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const currentLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 			if (!currentLayer) return;
 
 			const updateObj: Record<string, any> = { updateTriggers: {} };
@@ -603,7 +593,7 @@
 				updateObj.data = loadData();
 			}
 
-			layers.updateProps(layer.id, updateObj);
+			layers.updateProps(dataset.layerID, updateObj);
 		} catch (error) {
 			console.error('Error updating arc layer props:', error);
 		}

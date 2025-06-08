@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
-	import { chosenDataset, layers } from '$lib/io/stores';
+	import { layers } from '$lib/io/stores';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 
 	const CHUNK_SIZE = 100000;
@@ -16,7 +16,7 @@
 	let animationSpeed = $state<number>(1);
 	let trailLength = $state<number>(0.2); // Value from 0-1 for trail length
 
-	let { layer } = $props();
+	let { dataset } = $props();
 
 	async function* transformRows(rows: AsyncIterable<any>) {
 		let data = [];
@@ -163,7 +163,7 @@
 
 <div>
 	<div>
-		<ColumnDropdown bind:chosenColumn={fromLatitude} default_column="Starting Latitude" />
+		<ColumnDropdown {dataset} bind:chosenColumn={fromLatitude} default_column="Starting Latitude" />
 	</div>
 	<div>
 		<ColumnDropdown bind:chosenColumn={fromLongitude} default_column="Starting Longitude" />

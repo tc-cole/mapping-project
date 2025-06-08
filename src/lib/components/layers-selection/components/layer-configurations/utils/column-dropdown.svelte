@@ -1,6 +1,5 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { chosenDataset } from '$lib/io/stores';
 	import { ChevronDown, Check } from '@lucide/svelte';
 	import { cn } from '$lib/utils';
 
@@ -8,7 +7,8 @@
 		chosenColumn = $bindable<string | undefined>(),
 		default_column,
 		placeholder,
-		class: className = ''
+		class: className = '',
+		dataset
 	} = $props();
 
 	let displayText = $derived(chosenColumn || placeholder || `Select ${default_column}`);
@@ -27,13 +27,13 @@
 	</DropdownMenu.Trigger>
 
 	<DropdownMenu.Content class="w-full min-w-[200px]" align="start">
-		{#if $chosenDataset !== null}
-			{#if $chosenDataset.schema.length > 0}
+		{#if dataset !== null}
+			{#if dataset.schema.length > 0}
 				<DropdownMenu.Group>
 					<DropdownMenu.Label class="px-2 py-1.5 text-xs text-muted-foreground">
 						Available Columns
 					</DropdownMenu.Label>
-					{#each $chosenDataset.schema as column (column.name)}
+					{#each dataset.schema as column (column.name)}
 						<DropdownMenu.Item
 							class="flex items-center justify-between"
 							onclick={() => {
