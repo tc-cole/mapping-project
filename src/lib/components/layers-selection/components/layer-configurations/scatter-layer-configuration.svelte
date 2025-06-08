@@ -605,7 +605,7 @@
 			const client = await db.init();
 
 			if (dataset !== null) {
-				var filename = checkNameForSpacesAndHyphens(dataset.source.type.originalFilename);
+				var filename = checkNameForSpacesAndHyphens(dataset.source.originalFilename);
 
 				// Build column list for query
 				const columns = [latitudeColumn, longitudeColumn];

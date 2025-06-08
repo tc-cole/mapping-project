@@ -2,11 +2,11 @@
 	import { datasets } from '$lib/io/stores';
 	import DatasetCard from './components/dataset-card.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
-	import { Layers, ChevronDown, Plus } from '@lucide/svelte';
+	import { Layers, ChevronLeft, ChevronDown } from '@lucide/svelte';
 </script>
 
 <div class="bg-grey-800 overflow-hidden rounded-lg border border-border bg-card">
-	<Collapsible.Root open={true}>
+	<Collapsible.Root class="group">
 		<Collapsible.Trigger class="w-full">
 			{#snippet child({ props })}
 				<div
@@ -24,7 +24,7 @@
 					</div>
 					<ChevronDown
 						size={16}
-						class="text-muted-foreground transition-transform group-data-[state=open]/collapsible:rotate-180"
+						class="rotate-90 text-muted-foreground transition-transform group-data-[state=open]:rotate-0"
 					/>
 				</div>
 			{/snippet}

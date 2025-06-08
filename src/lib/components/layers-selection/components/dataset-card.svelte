@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge/index.js';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Badge } from '$lib/components/ui/badge';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 
 	import { layers } from '$lib/io/stores';
 	import {
@@ -10,9 +10,9 @@
 		AlertCircle,
 		CheckCircle,
 		Clock,
-		Settings,
 		Eye,
-		EyeOff
+		EyeOff,
+		ChevronDown
 	} from '@lucide/svelte';
 
 	import ScatterLayerConfiguration from './layer-configurations/scatter-layer-configuration.svelte';
@@ -131,173 +131,147 @@
 	};
 
 	const openConfiguration = () => {
-		configurationOpen = true;
+		configurationOpen = !configurationOpen;
 	};
 </script>
 
 <!-- Dataset Card -->
-<div
-	class="group relative rounded-lg border border-border bg-card transition-all duration-200 hover:shadow-md hover:{statusInfo.ring} hover:ring-2"
->
-	<!-- Main Card Content -->
+<Collapsible.Root bind:open={configurationOpen}>
 	<div
-		class="flex w-full cursor-pointer items-center gap-3 p-4"
-		onclick={openConfiguration}
-		role="button"
-		tabindex="0"
-		onkeydown={(e) => e.key === 'Enter' && openConfiguration()}
+		class="border-b-none group relative rounded-lg rounded-b-none border bg-card transition-all duration-200 hover:shadow-md hover:{statusInfo.ring} hover:ring-2"
 	>
-		<!-- Dataset Icon with Color -->
-		<div
-			class="flex h-10 w-10 items-center justify-center rounded-lg text-white shadow-sm"
-			style="background-color: {dataset.color || '#6b7280'}"
-		>
-			<DatasetIcon size={20} />
-		</div>
-
-		<!-- Main Content -->
-		<div class="min-w-0 flex-1">
-			<!-- Title and Status -->
-			<div class="mb-1 flex items-center gap-2">
-				<h3 class="truncate text-sm font-medium">{displayTitle}</h3>
-				<div class="flex items-center gap-1 {statusInfo.color}">
-					<statusInfo.icon size={14} />
-				</div>
-			</div>
-
-			<!-- Metadata Row -->
-			<div class="flex items-center gap-2 text-xs text-muted-foreground">
-				<!-- Row Count -->
-				{#if formattedRowCount}
-					<span class="font-mono">{formattedRowCount}</span>
-					<span class="text-border">•</span>
-				{/if}
-
-				<!-- File Type -->
-				<span class="font-medium capitalize">{dataset.source.fileType || dataset.datasetType}</span>
-
-				<!-- Location Info -->
-				{#if locationInfo?.hasCoords}
-					<span class="text-border">•</span>
-					<div class="flex items-center gap-1 text-green-600">
-						<MapPin size={10} />
-						<span class="font-medium">Coordinates Ready</span>
-					</div>
-				{:else if locationInfo}
-					<span class="text-border">•</span>
-					<span class="font-medium text-amber-600">{locationInfo.coordCount} coord suggestions</span
-					>
-				{/if}
-
-				<!-- Geometry Info -->
-				{#if geometryInfo}
-					<span class="text-border">•</span>
-					<span class="font-medium text-blue-600">{geometryInfo.type}</span>
-					{#if geometryInfo.featureCount > 1}
-						<span class="text-muted-foreground">({geometryInfo.featureCount} features)</span>
-					{/if}
-				{/if}
-			</div>
-		</div>
-
-		<!-- Tags -->
-		{#if dataset.tags && dataset.tags.length > 0}
-			<div class="flex flex-wrap gap-1">
-				{#each dataset.tags.slice(0, 2) as tag}
-					<Badge variant="secondary" class="px-2 py-0.5 text-xs capitalize">
-						{tag}
-					</Badge>
-				{/each}
-				{#if dataset.tags.length > 2}
-					<Badge variant="outline" class="px-2 py-0.5 text-xs">
-						+{dataset.tags.length - 2}
-					</Badge>
-				{/if}
-			</div>
-		{/if}
-
-		<!-- Configure Button -->
-		<div class="opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-			<Settings size={16} class="text-muted-foreground" />
-		</div>
-	</div>
-
-	<!-- Processing Progress Bar -->
-
-	<!-- Error Display -->
-	{#if dataset.status?.state === 'error'}
-		<div class="mx-4 mb-3 rounded-md border border-red-200 bg-red-50 p-2">
-			<div class="flex items-center gap-2 text-sm text-red-800">
-				<AlertCircle size={14} />
-				<span class="font-medium">Processing Error</span>
-			</div>
-			<p class="mt-1 text-xs text-red-700">
-				{dataset.status.message || 'An error occurred processing this dataset'}
-			</p>
-		</div>
-	{/if}
-
-	<!-- Filter Badge for Geometry -->
-	{#if geometryInfo?.isUsedAsFilter}
-		<div class="absolute left-2 top-2">
-			<Badge variant="default" class="bg-blue-600 px-2 py-0.5 text-xs">Filter Active</Badge>
-		</div>
-	{/if}
-
-	<!-- Action Buttons (top right) -->
-	<div
-		class="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-	>
-		<!-- Visibility Toggle -->
-		<button
-			class="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
-			onclick={(e) => {
-				e.stopPropagation();
-				toggleVisibility();
-			}}
-			title={isLayerVisible ? 'Hide layer' : 'Show layer'}
-		>
-			{#if isLayerVisible}
-				<Eye size={14} />
-			{:else}
-				<EyeOff size={14} />
-			{/if}
-		</button>
-
-		<!-- Remove Button -->
-		<button
-			class="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground backdrop-blur-sm transition-colors hover:text-destructive"
-			onclick={(e) => {
-				e.stopPropagation();
-				remove();
-			}}
-			title="Remove dataset and layer"
-		>
-			<X size={14} />
-		</button>
-	</div>
-</div>
-
-<!-- Configuration Dialog -->
-<Dialog.Root bind:open={configurationOpen}>
-	<Dialog.Content class="max-w-md">
-		<Dialog.Header>
-			<Dialog.Title class="flex items-center gap-2">
+		<!-- Main Card Content -->
+		<Collapsible.Trigger class="w-full">
+			{#snippet child({ props })}
 				<div
-					class="flex h-6 w-6 items-center justify-center rounded text-white"
-					style="background-color: {dataset.color || '#6b7280'}"
+					{...props}
+					class="flex w-full cursor-pointer items-center gap-3 p-4"
+					role="button"
+					tabindex="0"
 				>
-					<DatasetIcon size={14} />
-				</div>
-				Configure {dataset.datasetLabel}
-			</Dialog.Title>
-			<Dialog.Description>
-				Adjust visualization settings for this {layerType} layer.
-			</Dialog.Description>
-		</Dialog.Header>
+					<!-- Dataset Icon with Color -->
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-lg text-white shadow-sm"
+						style="background-color: {dataset.color || '#6b7280'}"
+					>
+						<DatasetIcon size={20} />
+					</div>
 
-		<!-- Configuration Content -->
-		<div class="py-4">
+					<!-- Main Content -->
+					<div class="min-w-0 flex-1">
+						<!-- Title and Status -->
+						<div class="mb-1 flex items-center gap-2">
+							<h3 class="truncate text-sm font-medium">{displayTitle}</h3>
+							<div class="flex items-center gap-1 {statusInfo.color}">
+								<statusInfo.icon size={14} />
+							</div>
+						</div>
+
+						<!-- Metadata Row -->
+						<div class="flex items-center gap-2 text-xs text-muted-foreground">
+							<!-- Row Count -->
+							{#if formattedRowCount}
+								<span class="font-mono">{formattedRowCount}</span>
+								<span class="text-border">•</span>
+							{/if}
+
+							<!-- File Type -->
+							<span class="font-medium capitalize"
+								>{dataset.source.fileType || dataset.datasetType}</span
+							>
+
+							<!-- Location Info -->
+							{#if locationInfo?.hasCoords}
+								<span class="text-border">•</span>
+								<div class="flex items-center gap-1 text-green-600">
+									<MapPin size={10} />
+									<span class="font-medium">Coordinates Ready</span>
+								</div>
+							{:else if locationInfo}
+								<span class="text-border">•</span>
+								<span class="font-medium text-amber-600"
+									>{locationInfo.coordCount} coord suggestions</span
+								>
+							{/if}
+
+							<!-- Geometry Info -->
+							{#if geometryInfo}
+								<span class="text-border">•</span>
+								<span class="font-medium text-blue-600">{geometryInfo.type}</span>
+								{#if geometryInfo.featureCount > 1}
+									<span class="text-muted-foreground">({geometryInfo.featureCount} features)</span>
+								{/if}
+							{/if}
+						</div>
+					</div>
+
+					<!-- Tags -->
+					{#if dataset.tags && dataset.tags.length > 0}
+						<div class="flex flex-wrap gap-1">
+							{#each dataset.tags.slice(0, 2) as tag}
+								<Badge variant="secondary" class="px-2 py-0.5 text-xs capitalize">
+									{tag}
+								</Badge>
+							{/each}
+							{#if dataset.tags.length > 2}
+								<Badge variant="outline" class="px-2 py-0.5 text-xs">
+									+{dataset.tags.length - 2}
+								</Badge>
+							{/if}
+						</div>
+					{/if}
+
+					<!-- Expand Indicator -->
+					<div class="flex items-center gap-2">
+						<ChevronDown
+							size={16}
+							class="rotate-90 text-muted-foreground transition-transform group-data-[state=open]:rotate-0"
+						/>
+					</div>
+				</div>
+			{/snippet}
+		</Collapsible.Trigger>
+
+		<!-- Action Buttons (top right) -->
+		<div
+			class="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+		>
+			<!-- Visibility Toggle -->
+			<button
+				class="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
+				onclick={(e) => {
+					e.stopPropagation();
+					toggleVisibility();
+				}}
+				title={isLayerVisible ? 'Hide layer' : 'Show layer'}
+			>
+				{#if isLayerVisible}
+					<Eye size={14} />
+				{:else}
+					<EyeOff size={14} />
+				{/if}
+			</button>
+
+			<!-- Remove Button -->
+			<button
+				class="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground backdrop-blur-sm transition-colors hover:text-destructive"
+				onclick={(e) => {
+					e.stopPropagation();
+					remove();
+				}}
+				title="Remove dataset and layer"
+			>
+				<X size={14} />
+			</button>
+		</div>
+	</div>
+
+	<!-- Configuration Panel (Collapsible Content) -->
+	<Collapsible.Content>
+		<div class="space-y-4 rounded-b-lg border-b border-l border-r border-border bg-muted/30 p-4">
+			<!-- Configuration Header -->
+
+			<!-- Configuration Content -->
 			{#if dataset.status?.state === 'ready'}
 				{#if layerType === 'location'}
 					<ScatterLayerConfiguration {dataset} />
@@ -305,17 +279,17 @@
 					<GeojsonLayerConfiguration {dataset} />
 				{:else}
 					<!-- Generic data layer configuration -->
-					<div class="p-8 text-center text-muted-foreground">
-						<Layers size={32} class="mx-auto mb-2 opacity-50" />
+					<div class="py-8 text-center text-muted-foreground">
+						<Layers size={24} class="mx-auto mb-2 opacity-50" />
 						<p class="text-sm">Layer configuration not available for this data type.</p>
 					</div>
 				{/if}
 			{:else}
-				<div class="p-8 text-center text-muted-foreground">
-					<Clock size={32} class="mx-auto mb-2 opacity-50" />
+				<div class="py-8 text-center text-muted-foreground">
+					<Clock size={24} class="mx-auto mb-2 opacity-50" />
 					<p class="text-sm">Configuration available when dataset is ready.</p>
 				</div>
 			{/if}
 		</div>
-	</Dialog.Content>
-</Dialog.Root>
+	</Collapsible.Content>
+</Collapsible.Root>
