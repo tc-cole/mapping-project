@@ -625,7 +625,7 @@
 </script>
 
 <!-- Toolbar for quick access to editing tools -->
-<div class="mt-4 flex items-center gap-3 rounded bg-gray-800 p-2">
+<div class=" flex items-center gap-3 rounded bg-gray-800 p-2">
 	<!-- Selection/Modify Tool -->
 	<button
 		class={`rounded p-2 transition-colors ${activeEditTool === 'simple_select' ? 'bg-blue-800' : 'hover:bg-gray-700'}`}

@@ -6,8 +6,9 @@
 
 <Drawer.Root direction="left" open={$openDrawer}>
 	<Drawer.Portal>
+		<Drawer.Title>Analysis</Drawer.Title>
 		<Drawer.Content
-			class="fixed bottom-0 right-0 top-0 flex h-full w-2/5 flex-col bg-zinc-800 shadow-lg"
+			class="fixed bottom-0 left-0 top-0 flex h-full w-1/5 flex-col bg-zinc-800 shadow-lg"
 			onEscapeKeydown={(e) => {
 				e.preventDefault();
 				openDrawer.set(false);
@@ -17,7 +18,7 @@
 				openDrawer.set(false);
 			}}
 		>
-			<BarChart />
+			<!--<BarChart />-->
 		</Drawer.Content>
 	</Drawer.Portal>
 </Drawer.Root>

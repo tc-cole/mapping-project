@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 
 	import { layers } from '$lib/io/stores';
@@ -205,25 +204,6 @@
 							{/if}
 						</div>
 					</div>
-
-					<!-- Tags -->
-					{#if dataset.tags && dataset.tags.length > 0}
-						<div class="flex flex-wrap gap-1">
-							{#each dataset.tags.slice(0, 2) as tag}
-								<Badge
-									variant="secondary"
-									class="border-gray-600 bg-gray-700 px-2 py-0.5 text-xs capitalize text-gray-200"
-								>
-									{tag}
-								</Badge>
-							{/each}
-							{#if dataset.tags.length > 2}
-								<Badge variant="outline" class="border-gray-600 px-2 py-0.5 text-xs text-gray-300">
-									+{dataset.tags.length - 2}
-								</Badge>
-							{/if}
-						</div>
-					{/if}
 
 					<!-- Expand Indicator -->
 					<div class="flex items-center gap-2">

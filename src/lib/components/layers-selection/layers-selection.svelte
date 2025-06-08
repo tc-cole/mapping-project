@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { datasets } from '$lib/io/stores';
-	import DatasetCard from './components/dataset-card.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
+	import DatasetCard from './components/dataset-card.svelte';
+	import { datasets } from '$lib/io/stores';
 	import { Layers, ChevronDown } from '@lucide/svelte';
 </script>
 

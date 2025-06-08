@@ -19,6 +19,7 @@
 	import ConfigField from './utils/config-field.svelte';
 	import Sectional from './utils/sectional.svelte';
 
+	console.log();
 	let latitudeColumn = $state<string | undefined>();
 	let longitudeColumn = $state<string | undefined>();
 	let sizeColumn = $state<string | null>(null);
@@ -82,41 +83,30 @@
 	}
 
 	let hasAppliedInference = $state(false);
-
 	$effect(() => {
 		if (!requiredColumnsSelected) return;
 
-		if ($clickedGeoJSON && $clickedGeoJSON !== currentFilter && !isFiltered) {
-			// New filter applied
+		const clickedGeometryId = $clickedGeoJSON ? getGeometryId($clickedGeoJSON) : null;
+		const currentFilterId = currentFilter ? getGeometryId(currentFilter) : null;
+
+		if ($clickedGeoJSON && clickedGeometryId !== currentFilterId && !isFiltered) {
 			currentFilter = $clickedGeoJSON;
 			isFiltered = true;
+			selectedGeometryId.set(clickedGeometryId);
 
-			const geometryId = getGeometryId($clickedGeoJSON);
-
-			// Set the selected geometry ID
-			selectedGeometryId.set(geometryId);
-
-			// Create or get existing filter table
 			createTempFilterTable($clickedGeoJSON).then((filterInfo) => {
 				if (filterInfo) {
-					//console.log(`Geometry ${geometryId} mapped to table: ${filterInfo.tableName}`);
-
-					// Update layer with filtered data from the table
-					layers.updateProps(dataset.datasetID, {
-						data: loadDataFromTable(filterInfo.tableName)
-					});
+					// Instead of updating props, recreate the layer with filtered data
+					recreateLayerWithFilteredData(filterInfo.tableName);
 				}
 			});
 		} else if (!$clickedGeoJSON && isFiltered) {
-			// Filter cleared
 			currentFilter = null;
 			isFiltered = false;
 			selectedGeometryId.set(null);
 
-			// Return to original data
-			layers.updateProps(dataset.datasetID, {
-				data: loadData()
-			});
+			// Recreate layer with original data
+			recreateLayerWithOriginalData();
 		}
 	});
 
@@ -253,6 +243,48 @@
 		};
 	}
 
+	function recreateLayerWithFilteredData(tableName: string) {
+		// Remove existing layer
+		layers.remove(dataset.datasetID);
+
+		// Create new layer with filtered data
+		const layerProps = {
+			data: loadDataFromTable(tableName),
+			getPosition: (d: Point) => d.position || [0, 0],
+			getRadius: (d: Point) => getPointRadius(d),
+			getFillColor: (d: Point) => getPointColor(d),
+			getLineColor: [0, 0, 0],
+			lineWidthMinPixels: 1,
+			pickable: true,
+			autoHighlight: true,
+			stroked: true,
+			filled: true,
+			radiusScale: 1,
+			radiusMinPixels: 1,
+			radiusMaxPixels: 100,
+			opacity: opacity,
+			updateTriggers: {
+				getRadius: [pointRadius, sizeColumn, minPointRadius, maxPointRadius, sizeRange],
+				getFillColor: [colorColumn, colorScale, colorRange, opacity]
+			},
+			latColumn: latitudeColumn,
+			lngColumn: longitudeColumn,
+			sizeColumn: sizeColumn,
+			colorColumn: colorColumn,
+			labelColumn: labelColumn
+		};
+
+		const newLayer = LayerFactory.create('scatter', {
+			id: dataset.datasetID,
+			props: layerProps
+		});
+
+		layers.add(newLayer);
+	}
+	function recreateLayerWithOriginalData() {
+		// Just call the original createScatterLayer function
+		createScatterLayer();
+	}
 	// Updated createTempFilterTable function
 	async function createTempFilterTable(feature: any) {
 		if (!feature || !feature.geometry) {
@@ -261,7 +293,7 @@
 		}
 
 		try {
-			const db = SingletonDatabase.getInstance();
+			const db = SingletonDatabase.getInstance({ logQueries: false });
 			const client = await db.init();
 
 			// Load spatial extension
@@ -584,26 +616,34 @@
 
 	async function* loadDataFromTable(tableName: string) {
 		try {
+			// Yield empty data first
 			yield [];
 
-			const db = SingletonDatabase.getInstance();
+			const db = SingletonDatabase.getInstance({ logQueries: false });
 			const client = await db.init();
 
-			// Build column list for query (same as your existing logic)
 			const columns = [latitudeColumn, longitudeColumn];
 			if (sizeColumn) columns.push(sizeColumn);
 			if (colorColumn) columns.push(colorColumn);
 			if (labelColumn) columns.push(labelColumn);
 
 			const columnsStr = columns.join(', ');
+			console.log(`Loading data from filter table: ${tableName}`);
 
-			//console.log(`Loading data from filter table: ${tableName}`);
-
-			// Query the pre-filtered table instead of doing spatial filtering again
 			const stream = await client.queryStream(`SELECT ${columnsStr} FROM ${tableName}`);
 
-			// Use your existing transformRows function
-			yield* transformRows(stream.readRows());
+			const dataGenerator = transformRows(stream.readRows());
+			let finalData: any[] = [];
+
+			for await (const batch of dataGenerator) {
+				finalData = batch; // Keep the latest batch (which accumulates all data)
+				yield batch; // Yield intermediate results for progressive loading
+			}
+
+			// Ensure we yield the final complete dataset
+			if (finalData.length > 0) {
+				yield finalData;
+			}
 		} catch (error) {
 			console.error(`Error loading data from table ${tableName}:`, error);
 			yield [];
@@ -616,7 +656,7 @@
 			yield [];
 
 			// Get database instance
-			const db = SingletonDatabase.getInstance();
+			const db = SingletonDatabase.getInstance({ logQueries: false });
 			const client = await db.init();
 
 			if (dataset !== null) {
