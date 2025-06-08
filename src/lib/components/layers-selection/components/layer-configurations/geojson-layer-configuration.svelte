@@ -81,7 +81,7 @@
 		}
 
 		// Find the current layer
-		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+		const currentLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 
 		// Recreate layer if geojson column has changed
 		if (currentLayer && currentLayer.props.geojsonColumn !== geojsonColumn) {
@@ -605,15 +605,15 @@
 			};
 
 			// First check if a layer with this ID already exists (cleanup)
-			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const existingLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 			if (existingLayer) {
-				console.log(`Removing existing layer with ID: ${layer.id}`);
-				layers.remove(layer.id);
+				console.log(`Removing existing layer with ID: ${dataset.layerID}`);
+				layers.remove(dataset.layerID);
 			}
 
 			// Create a new GeoJSON layer
 			const newLayer = LayerFactory.create('geojson', {
-				id: layer.id,
+				id: dataset.layerID,
 				props: layerProps
 			});
 
@@ -629,9 +629,9 @@
 	function updateOptionalProps(changedProps: Record<string, any>) {
 		try {
 			// Find the current layer
-			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const currentLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 			if (!currentLayer) {
-				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				console.warn(`Cannot update layer with ID: ${dataset.layerID} - layer not found`);
 				return;
 			}
 
@@ -714,7 +714,7 @@
 
 			// Apply the updates
 			console.log('Updating GeoJSON layer properties:', Object.keys(changedProps).join(', '));
-			layers.updateProps(layer.id, updateObj);
+			layers.updateProps(dataset.layerID, updateObj);
 		} catch (error) {
 			console.error('Error updating GeoJSON layer props:', error);
 		}

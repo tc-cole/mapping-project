@@ -304,7 +304,6 @@
 			// Add to datasets store
 			datasets.update((datasets) => [...datasets, dataset]);
 
-			console.log('Created dataset for drawn feature:', dataset);
 			return dataset;
 		} catch (error) {
 			console.error('Error creating dataset from drawn feature:', error);
@@ -377,8 +376,6 @@
 				newDatasets[datasetIndex] = updatedDataset;
 				return newDatasets;
 			});
-
-			console.log('Updated dataset for modified feature:', updatedDataset);
 		} catch (error) {
 			console.error('Error updating dataset for drawn feature:', error);
 		}
@@ -396,8 +393,6 @@
 
 			// Remove from store
 			datasets.update((datasets) => datasets.filter((d) => d.datasetID !== dataset.datasetID));
-
-			console.log('Removed dataset for deleted feature:', dataset.datasetID);
 		} catch (error) {
 			console.error('Error removing dataset for drawn feature:', error);
 		}
@@ -529,8 +524,6 @@
 					});
 				}
 			});
-
-			console.log('Drawing completed and mask applied:', feature);
 		} catch (error) {
 			console.error('Error completing drawing:', error);
 		}
@@ -594,10 +587,6 @@
 
 				// Trigger reactivity update
 				selectionTrigger++;
-
-				console.log('Deleted features:', idsToDelete);
-			} else {
-				console.log('No features selected for deletion');
 			}
 		} catch (error) {
 			console.error('Error deleting features:', error);
