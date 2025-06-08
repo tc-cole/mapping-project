@@ -17,8 +17,9 @@
 
 	import ScatterLayerConfiguration from './layer-configurations/scatter-layer-configuration.svelte';
 	import GeojsonLayerConfiguration from './layer-configurations/geojson-layer-configuration.svelte';
+	import type { Dataset } from '$lib/types';
 
-	let { dataset } = $props();
+	let { dataset }: { dataset: Dataset } = $props<{ dataset: Dataset }>();
 	let configurationOpen = $state(false);
 
 	// Determine layer type from dataset metadata
@@ -42,35 +43,35 @@
 		return `${dataset.datasetLabel} • ${typeLabels[layerType]}`;
 	});
 
-	// Get status color and icon
+	// Get status color and icon (updated for dark theme)
 	const statusInfo = $derived.by(() => {
 		switch (dataset.status?.state) {
 			case 'ready':
 				return {
-					color: 'text-green-600',
+					color: 'text-green-400',
 					icon: CheckCircle,
-					bg: 'bg-green-50 border-green-200',
+					bg: 'bg-green-900/30 border-green-700',
 					ring: 'ring-green-500/20'
 				};
 			case 'processing':
 				return {
-					color: 'text-blue-600',
+					color: 'text-blue-400',
 					icon: Clock,
-					bg: 'bg-blue-50 border-blue-200',
+					bg: 'bg-blue-900/30 border-blue-700',
 					ring: 'ring-blue-500/20'
 				};
 			case 'error':
 				return {
-					color: 'text-red-600',
+					color: 'text-red-400',
 					icon: AlertCircle,
-					bg: 'bg-red-50 border-red-200',
+					bg: 'bg-red-900/30 border-red-700',
 					ring: 'ring-red-500/20'
 				};
 			default:
 				return {
-					color: 'text-gray-600',
+					color: 'text-gray-400',
 					icon: Layers,
-					bg: 'bg-gray-50 border-gray-200',
+					bg: 'bg-gray-800 border-gray-600',
 					ring: 'ring-gray-500/20'
 				};
 		}
@@ -138,14 +139,14 @@
 <!-- Dataset Card -->
 <Collapsible.Root bind:open={configurationOpen}>
 	<div
-		class="border-b-none group relative rounded-lg rounded-b-none border bg-card transition-all duration-200 hover:shadow-md hover:{statusInfo.ring} hover:ring-2"
+		class="border-b-none group relative rounded-lg rounded-b-none border border-gray-600 bg-gray-800 transition-all duration-200 hover:shadow-lg hover:shadow-gray-900/20 hover:{statusInfo.ring} hover:ring-2"
 	>
 		<!-- Main Card Content -->
 		<Collapsible.Trigger class="w-full">
 			{#snippet child({ props })}
 				<div
 					{...props}
-					class="flex w-full cursor-pointer items-center gap-3 p-4"
+					class="hover:bg-gray-750 flex w-full cursor-pointer items-center gap-3 p-4"
 					role="button"
 					tabindex="0"
 				>
@@ -161,18 +162,18 @@
 					<div class="min-w-0 flex-1">
 						<!-- Title and Status -->
 						<div class="mb-1 flex items-center gap-2">
-							<h3 class="truncate text-sm font-medium">{displayTitle}</h3>
+							<h3 class="truncate text-sm font-medium text-white">{displayTitle}</h3>
 							<div class="flex items-center gap-1 {statusInfo.color}">
 								<statusInfo.icon size={14} />
 							</div>
 						</div>
 
 						<!-- Metadata Row -->
-						<div class="flex items-center gap-2 text-xs text-muted-foreground">
+						<div class="flex items-center gap-2 text-xs text-gray-300">
 							<!-- Row Count -->
 							{#if formattedRowCount}
 								<span class="font-mono">{formattedRowCount}</span>
-								<span class="text-border">•</span>
+								<span class="text-gray-500">•</span>
 							{/if}
 
 							<!-- File Type -->
@@ -182,24 +183,24 @@
 
 							<!-- Location Info -->
 							{#if locationInfo?.hasCoords}
-								<span class="text-border">•</span>
-								<div class="flex items-center gap-1 text-green-600">
+								<span class="text-gray-500">•</span>
+								<div class="flex items-center gap-1 text-green-400">
 									<MapPin size={10} />
 									<span class="font-medium">Coordinates Ready</span>
 								</div>
 							{:else if locationInfo}
-								<span class="text-border">•</span>
-								<span class="font-medium text-amber-600"
+								<span class="text-gray-500">•</span>
+								<span class="font-medium text-amber-400"
 									>{locationInfo.coordCount} coord suggestions</span
 								>
 							{/if}
 
 							<!-- Geometry Info -->
 							{#if geometryInfo}
-								<span class="text-border">•</span>
-								<span class="font-medium text-blue-600">{geometryInfo.type}</span>
+								<span class="text-gray-500">•</span>
+								<span class="font-medium text-blue-400">{geometryInfo.type}</span>
 								{#if geometryInfo.featureCount > 1}
-									<span class="text-muted-foreground">({geometryInfo.featureCount} features)</span>
+									<span class="text-gray-400">({geometryInfo.featureCount} features)</span>
 								{/if}
 							{/if}
 						</div>
@@ -209,12 +210,15 @@
 					{#if dataset.tags && dataset.tags.length > 0}
 						<div class="flex flex-wrap gap-1">
 							{#each dataset.tags.slice(0, 2) as tag}
-								<Badge variant="secondary" class="px-2 py-0.5 text-xs capitalize">
+								<Badge
+									variant="secondary"
+									class="border-gray-600 bg-gray-700 px-2 py-0.5 text-xs capitalize text-gray-200"
+								>
 									{tag}
 								</Badge>
 							{/each}
 							{#if dataset.tags.length > 2}
-								<Badge variant="outline" class="px-2 py-0.5 text-xs">
+								<Badge variant="outline" class="border-gray-600 px-2 py-0.5 text-xs text-gray-300">
 									+{dataset.tags.length - 2}
 								</Badge>
 							{/if}
@@ -225,7 +229,7 @@
 					<div class="flex items-center gap-2">
 						<ChevronDown
 							size={16}
-							class="rotate-90 text-muted-foreground transition-transform group-data-[state=open]:rotate-0"
+							class="rotate-90 text-gray-400 transition-transform group-data-[state=open]:rotate-0"
 						/>
 					</div>
 				</div>
@@ -238,7 +242,7 @@
 		>
 			<!-- Visibility Toggle -->
 			<button
-				class="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
+				class="rounded-md border border-gray-600 bg-gray-800/90 p-1.5 text-gray-300 backdrop-blur-sm transition-colors hover:bg-gray-700 hover:text-white"
 				onclick={(e) => {
 					e.stopPropagation();
 					toggleVisibility();
@@ -254,7 +258,7 @@
 
 			<!-- Remove Button -->
 			<button
-				class="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground backdrop-blur-sm transition-colors hover:text-destructive"
+				class="rounded-md border border-gray-600 bg-gray-800/90 p-1.5 text-gray-300 backdrop-blur-sm transition-colors hover:bg-gray-700 hover:text-red-400"
 				onclick={(e) => {
 					e.stopPropagation();
 					remove();
@@ -268,7 +272,9 @@
 
 	<!-- Configuration Panel (Collapsible Content) -->
 	<Collapsible.Content>
-		<div class="space-y-4 rounded-b-lg border-b border-l border-r border-border bg-muted/30 p-4">
+		<div
+			class="space-y-4 rounded-b-lg border-b border-l border-r border-gray-600 bg-gray-700/50 p-4"
+		>
 			<!-- Configuration Header -->
 
 			<!-- Configuration Content -->
@@ -279,13 +285,13 @@
 					<GeojsonLayerConfiguration {dataset} />
 				{:else}
 					<!-- Generic data layer configuration -->
-					<div class="py-8 text-center text-muted-foreground">
+					<div class="py-8 text-center text-gray-300">
 						<Layers size={24} class="mx-auto mb-2 opacity-50" />
 						<p class="text-sm">Layer configuration not available for this data type.</p>
 					</div>
 				{/if}
 			{:else}
-				<div class="py-8 text-center text-muted-foreground">
+				<div class="py-8 text-center text-gray-300">
 					<Clock size={24} class="mx-auto mb-2 opacity-50" />
 					<p class="text-sm">Configuration available when dataset is ready.</p>
 				</div>

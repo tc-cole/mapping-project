@@ -49,6 +49,18 @@
 
 	let { dataset }: { dataset: Dataset } = $props<{ dataset: Dataset }>();
 
+	const chosenColumns = dataset.metadata?.location?.chosenColumns;
+	if (!chosenColumns?.longitude || !chosenColumns.latitude) {
+		const topRecommendations =
+			dataset.metadata?.location?.recommendations.suggestedCoordinatePairs[0];
+		if (topRecommendations) {
+			latitudeColumn = topRecommendations?.latitude;
+			longitudeColumn = topRecommendations?.longitude;
+		} else {
+			latitudeColumn = chosenColumns?.latitude;
+			longitudeColumn = chosenColumns?.longitude;
+		}
+	}
 	// Used to store pre-calculated values for size and color ranges
 	let sizeRange = [0, 1];
 	let colorRange = [0, 1];
@@ -264,7 +276,10 @@
 				return null;
 			}
 
-			const sourceTable = checkNameForSpacesAndHyphens(dataset.datasetName);
+			const filename =
+				dataset.source.type === 'file'
+					? checkNameForSpacesAndHyphens(dataset.source.originalFilename)
+					: dataset.datasetName;
 
 			// Build columns array
 			if (!latitudeColumn || !longitudeColumn) return;
@@ -278,7 +293,7 @@
 			const filterInfo = await filterManager.getOrCreateFilterTable(
 				feature,
 				client,
-				sourceTable,
+				filename,
 				columns
 			);
 
@@ -605,7 +620,10 @@
 			const client = await db.init();
 
 			if (dataset !== null) {
-				var filename = checkNameForSpacesAndHyphens(dataset.source.originalFilename);
+				const filename =
+					dataset.source.type === 'file'
+						? checkNameForSpacesAndHyphens(dataset.source.originalFilename)
+						: dataset.datasetName;
 
 				// Build column list for query
 				const columns = [latitudeColumn, longitudeColumn];

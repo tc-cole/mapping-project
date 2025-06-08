@@ -2,10 +2,10 @@
 	import { datasets } from '$lib/io/stores';
 	import DatasetCard from './components/dataset-card.svelte';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
-	import { Layers, ChevronLeft, ChevronDown } from '@lucide/svelte';
+	import { Layers, ChevronDown } from '@lucide/svelte';
 </script>
 
-<div class="bg-grey-800 overflow-hidden rounded-lg border border-border bg-card">
+<div class="w-100 overflow-hidden rounded-lg border border-gray-600 bg-gray-800">
 	<Collapsible.Root class="group">
 		<Collapsible.Trigger class="w-full">
 			{#snippet child({ props })}

@@ -17,52 +17,53 @@
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger class={cn('w-full', className)}>
 		<button
-			class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+			class="flex h-9 w-full items-center justify-between rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white transition-colors hover:border-gray-500 hover:bg-gray-600"
 		>
-			<span class={cn('truncate text-left', !chosenColumn && 'text-muted-foreground')}>
+			<span class={cn('truncate text-left', !chosenColumn && 'text-gray-400')}>
 				{displayText}
 			</span>
-			<ChevronDown class="ml-2 h-4 w-4 flex-shrink-0 opacity-50" />
+			<ChevronDown class="ml-2 h-4 w-4 flex-shrink-0 text-gray-400" />
 		</button>
 	</DropdownMenu.Trigger>
 
-	<DropdownMenu.Content class="w-full min-w-[200px]" align="start">
+	<DropdownMenu.Content
+		class="w-full min-w-[200px] border border-gray-600 bg-gray-800"
+		align="start"
+	>
 		{#if dataset !== null}
 			{#if dataset.schema.length > 0}
 				<DropdownMenu.Group>
-					<DropdownMenu.Label class="px-2 py-1.5 text-xs text-muted-foreground">
+					<DropdownMenu.Label class="px-2 py-1.5 text-xs text-gray-400">
 						Available Columns
 					</DropdownMenu.Label>
 					{#each dataset.schema as column (column.name)}
 						<DropdownMenu.Item
-							class="flex items-center justify-between"
+							class="flex items-center justify-between text-white hover:bg-gray-500 focus:bg-gray-700"
 							onclick={() => {
 								chosenColumn = column.name;
 							}}
 						>
 							<div class="flex flex-col items-start">
-								<span class="text-sm">{column.name}</span>
-								<span class="text-xs text-muted-foreground">{column.type}</span>
+								<span class="text-sm text-white">{column.name}</span>
+								<span class="text-xs text-gray-400">{column.type}</span>
 							</div>
 							{#if chosenColumn === column.name}
-								<Check class="h-4 w-4 text-primary" />
+								<Check class="h-4 w-4 text-blue-400" />
 							{/if}
 						</DropdownMenu.Item>
 					{/each}
 				</DropdownMenu.Group>
 			{:else}
-				<div class="px-2 py-6 text-center text-sm text-muted-foreground">No columns available</div>
+				<div class="px-2 py-6 text-center text-sm text-gray-400">No columns available</div>
 			{/if}
 		{:else}
-			<div class="px-2 py-6 text-center text-sm text-muted-foreground">
-				Please select a dataset first
-			</div>
+			<div class="px-2 py-6 text-center text-sm text-gray-400">Please select a dataset first</div>
 		{/if}
 
 		{#if chosenColumn}
-			<DropdownMenu.Separator />
+			<DropdownMenu.Separator class="bg-gray-600" />
 			<DropdownMenu.Item
-				class="text-sm text-muted-foreground"
+				class="text-sm text-gray-400 hover:bg-gray-700 hover:text-gray-300 focus:bg-gray-700"
 				onclick={() => {
 					chosenColumn = undefined;
 				}}
