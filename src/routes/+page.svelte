@@ -1,25 +1,17 @@
 <script lang="ts">
-	import AppSidebar from '$lib/components/nav-sidebar/navigation-sidebar.svelte';
-	import DeckGL from '$lib/components/DeckGL/DeckGL.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	//import AppSidebar from '$lib/components/layers-selection/layers-selection.svelte';
+	import DeckGL from '$lib/components/deck-gl/DeckGL.svelte';
+	//import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import ChartsDrawer from '$lib/components/charts-drawer/charts-drawer.svelte';
-	import DrawingTools from '$lib/components/menu/DrawingTools.svelte';
+	import DrawingTools from '$lib/components/drawing-tools/drawing-tools.svelte';
 	import { openDrawer, openSidebar } from '$lib/io/stores';
+	import DataInput from '$lib/components/data-input/data-input.svelte';
+	import LayersSelection from '$lib/components/layers-selection/layers-selection.svelte';
+	//import { Button } from '$lib/components/ui/button/index.js';
 </script>
 
 <div class="app-container">
-	<Sidebar.Provider>
-		<AppSidebar />
-		<div class="z-10">
-			<Sidebar.Trigger
-				onclick={() => {
-					$openSidebar = !$openSidebar;
-				}}
-			/>
-		</div>
-	</Sidebar.Provider>
-
-	<ChartsDrawer />
+	<!--<ChartsDrawer /> -->
 
 	<DeckGL />
 
@@ -30,6 +22,13 @@
 		class:drawer-open={$openDrawer}
 	>
 		<DrawingTools />
+	</div>
+	<div class="data-input-container">
+		<DataInput />
+	</div>
+
+	<div class="layer-selection-container">
+		<LayersSelection />
 	</div>
 </div>
 
@@ -49,9 +48,23 @@
 		transition: left 0.2s ease-out;
 	}
 
+	.layer-selection-container {
+		position: absolute;
+		top: 5rem;
+		right: 1rem;
+		z-index: 10;
+	}
+
+	.data-input-container {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+		z-index: 10;
+	}
+
 	/* When sidebar is open, adjust the position */
 	.drawing-tools-container.sidebar-open {
-		left: calc(50% + 128px); /* 50% + half of sidebar width (256px/2) */
+		left: calc(30% + 128px); /* 50% + half of sidebar width (256px/2) */
 	}
 
 	/* When drawer is open, adjust the position */

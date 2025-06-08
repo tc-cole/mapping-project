@@ -2,7 +2,7 @@
 	import { checkNameForSpacesAndHyphens } from '$lib/io/FileUtils';
 	import { LayerFactory } from '$lib/io/layer-management.svelte';
 
-	import { chosenDataset, layers } from '$lib/io/stores';
+	import { layers } from '$lib/io/stores';
 	import { SingletonDatabase } from '$lib/io/DuckDBWASMClient.svelte';
 	import ColumnDropdown from './utils/column-dropdown.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -59,7 +59,7 @@
 	// Scale types
 	const scaleTypes = ['linear', 'log'];
 
-	let { layer } = $props();
+	let { dataset } = $props();
 
 	// Use derived state for checking if required columns are selected
 	let requiredColumnsSelected = $derived(geojsonColumn !== undefined);
@@ -81,7 +81,7 @@
 		}
 
 		// Find the current layer
-		const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+		const currentLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 
 		// Recreate layer if geojson column has changed
 		if (currentLayer && currentLayer.props.geojsonColumn !== geojsonColumn) {
@@ -502,8 +502,8 @@
 			const db = SingletonDatabase.getInstance();
 			const client = await db.init();
 
-			if ($chosenDataset !== null) {
-				var filename = checkNameForSpacesAndHyphens($chosenDataset.datasetName);
+			if (dataset !== null) {
+				var filename = checkNameForSpacesAndHyphens(dataset.datasetName);
 
 				// Build column list for query
 				const columnsList = [geojsonColumn];
@@ -605,15 +605,15 @@
 			};
 
 			// First check if a layer with this ID already exists (cleanup)
-			const existingLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const existingLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 			if (existingLayer) {
-				console.log(`Removing existing layer with ID: ${layer.id}`);
-				layers.remove(layer.id);
+				console.log(`Removing existing layer with ID: ${dataset.layerID}`);
+				layers.remove(dataset.layerID);
 			}
 
 			// Create a new GeoJSON layer
 			const newLayer = LayerFactory.create('geojson', {
-				id: layer.id,
+				id: dataset.layerID,
 				props: layerProps
 			});
 
@@ -629,9 +629,9 @@
 	function updateOptionalProps(changedProps: Record<string, any>) {
 		try {
 			// Find the current layer
-			const currentLayer = layers.snapshot.find((l) => l.id === layer.id);
+			const currentLayer = layers.snapshot.find((l) => l.id === dataset.layerID);
 			if (!currentLayer) {
-				console.warn(`Cannot update layer with ID: ${layer.id} - layer not found`);
+				console.warn(`Cannot update layer with ID: ${dataset.layerID} - layer not found`);
 				return;
 			}
 
@@ -714,7 +714,7 @@
 
 			// Apply the updates
 			console.log('Updating GeoJSON layer properties:', Object.keys(changedProps).join(', '));
-			layers.updateProps(layer.id, updateObj);
+			layers.updateProps(dataset.layerID, updateObj);
 		} catch (error) {
 			console.error('Error updating GeoJSON layer props:', error);
 		}
@@ -733,7 +733,12 @@
 		<span class="text-sm text-gray-200">Filter other layers with this shape</span>
 	</label>
 	-->
-	<ColumnDropdown bind:chosenColumn={geojsonColumn} default_column="GeoJSON" />
+	<ColumnDropdown
+		{dataset}
+		bind:chosenColumn={geojsonColumn}
+		default_column="GeoJSON"
+		placeholder="geojson"
+	/>
 	{#if !requiredColumnsSelected}
 		<div class="mt-2 text-amber-500">Please select a GeoJSON column to display data.</div>
 	{/if}
@@ -742,7 +747,12 @@
 {#if requiredColumnsSelected}
 	<Sectional label="Color Configuration">
 		<div class="grid grid-cols-2 gap-2">
-			<ColumnDropdown bind:chosenColumn={colorProperty} default_column="Color" />
+			<ColumnDropdown
+				{dataset}
+				bind:chosenColumn={colorProperty}
+				default_column="Color"
+				placeholder="color"
+			/>
 
 			<select
 				class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
@@ -795,7 +805,12 @@
 
 		{#if extruded}
 			<div class="mt-3 grid grid-cols-2 gap-2">
-				<ColumnDropdown bind:chosenColumn={elevationProperty} default_column="Elevation" />
+				<ColumnDropdown
+					{dataset}
+					bind:chosenColumn={elevationProperty}
+					default_column="Elevation"
+					placeholder="Elevation"
+				/>
 				<input type="range" min="1" max="100" step="1" bind:value={elevationScale} class="w-full" />
 			</div>
 		{/if}

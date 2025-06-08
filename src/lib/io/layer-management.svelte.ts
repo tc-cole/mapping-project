@@ -21,7 +21,9 @@ export type LayerType = 'scatter' | 'geojson' | 'arc' | 'line' | 'path' | 'polyg
 //| 'trips';
 
 export interface LayerDef {
+	//icon: any;
 	label: string; // human‑readable
+	//title: string;
 	ctor: LayerCtor; // Deck.GL constructor
 	defaultProps: Record<string, any>; // minimal safe defaults
 }
@@ -63,8 +65,6 @@ export class LayerStore {
 		return new LayerStore(parsed, { ...opts, persistKey: key });
 	}
 
-	/* ---- ctor ---- */
-
 	constructor(
 		initial: DeckLayerEntry[] = [],
 		private opts: LayerStoreOpts = {}
@@ -73,16 +73,10 @@ export class LayerStore {
 		if (opts.persistKey) this.persist();
 	}
 
-	/* ------------------------------------------------------------------ */
-	/* PUBLIC API                                                         */
-	/* ------------------------------------------------------------------ */
-
-	/** Svelte store subscription */
 	subscribe(run: (v: DeckLayerEntry[]) => void, invalidate?: () => void) {
 		return this._store.subscribe(run, invalidate);
 	}
 
-	/** Non‑reactive snapshot */
 	get snapshot(): DeckLayerEntry[] {
 		return get(this._store);
 	}
@@ -151,17 +145,12 @@ export class LayerStore {
 		};
 	}
 
-	/* ------------------------------------------------------------------ */
-	/* INTERNALS                                                          */
-	/* ------------------------------------------------------------------ */
-
 	private _store: Writable<DeckLayerEntry[]>;
 	private events: EventMap = {};
 
 	private batching = false;
 	private pending?: DeckLayerEntry[];
 
-	/* ---- history ---- */
 	private history: DeckLayerEntry[][] = [];
 	private histPtr = -1;
 

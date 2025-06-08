@@ -1,28 +1,10 @@
 import { storeFromLocalStorage } from '$lib/io/storage';
 import { writable } from 'svelte/store';
-import type { TableField } from './DuckDBWASMClient.svelte';
 import { LayerStore } from './layer-management.svelte';
 import { type MapViewState } from '@deck.gl/core';
-
-type Dataset = {
-	datasetName: string;
-	datasetID: string;
-	schema: TableField[];
-};
-
-interface FilterTableInfo {
-	tableName: string;
-	geometryId: string;
-	geometrySnapshot: string;
-	rowCount: number;
-	columns: string[];
-	sourceTable: string;
-	lastUsed: number;
-	created: number;
-}
+import type { Dataset, FilterTableInfo } from '$lib/types';
 
 export const datasets = writable<Dataset[]>(storeFromLocalStorage('datasets', []));
-export const chosenDataset = writable<Dataset | null>(storeFromLocalStorage('chosenDataset', null));
 
 export const layers = new LayerStore();
 export const mapboxDrawInstance = writable<any>();

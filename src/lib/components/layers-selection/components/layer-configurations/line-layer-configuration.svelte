@@ -493,14 +493,22 @@
 </script>
 
 <Sectional label="Required Columns">
-	<ColumnDropdown bind:chosenColumn={sourcePositionColumn} default_column="Source" />
-	<ColumnDropdown bind:chosenColumn={targetPositionColumn} default_column="Target" />
-	<ColumnDropdown bind:chosenColumn={idColumn} default_column="ID" />
+	<ColumnDropdown
+		bind:chosenColumn={sourcePositionColumn}
+		default_column="Source"
+		placeholder="Source"
+	/>
+	<ColumnDropdown
+		bind:chosenColumn={targetPositionColumn}
+		default_column="Target"
+		placeholder="Target"
+	/>
+	<ColumnDropdown bind:chosenColumn={idColumn} default_column="ID" placeholder="ID" />
 </Sectional>
 
 <Sectional label="Optional Columns">
-	<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" />
-	<ColumnDropdown bind:chosenColumn={widthColumn} default_column="Width" />
+	<ColumnDropdown bind:chosenColumn={colorColumn} default_column="Color" placeholder="Color" />
+	<ColumnDropdown bind:chosenColumn={widthColumn} default_column="Width" placeholder="Width" />
 </Sectional>
 
 <Sectional label="Color Settings">
