@@ -11,7 +11,7 @@
 </script>
 
 <div class="app-container">
-	<ChartsDrawer />
+	<!--<ChartsDrawer /> -->
 
 	<DeckGL />
 
