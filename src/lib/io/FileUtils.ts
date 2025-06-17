@@ -1,3 +1,5 @@
+import type { Dataset } from '$lib/types';
+
 export function getTableName(name: string): string {
 	var f_name = stripSpaces(name);
 	return f_name.substring(0, name.lastIndexOf('.'));
@@ -38,4 +40,28 @@ export function classifyInput(input: string): 'URL' | 'Filename' | 'Unknown' {
 	} else {
 		return 'Unknown';
 	}
+}
+
+/**
+ * Searches datasets by filename
+ * @param datasets - Array of dataset objects
+ * @param searchQuery - The search term to filter by
+ * @param caseSensitive - Whether the search should be case sensitive (default: false)
+ * @returns Filtered array of datasets matching the search query
+ */
+export function searchDatasetsByFilename(
+	datasets: Dataset[],
+	searchQuery: string,
+	caseSensitive: boolean = false
+): Dataset[] {
+	if (!searchQuery.trim()) {
+		return datasets; // Return all datasets if search query is empty
+	}
+
+	const query = caseSensitive ? searchQuery : searchQuery.toLowerCase();
+
+	return datasets.filter((dataset) => {
+		const filename = caseSensitive ? dataset.datasetName : dataset.datasetName.toLowerCase();
+		return filename.includes(query);
+	});
 }

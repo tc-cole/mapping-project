@@ -18,7 +18,6 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { ChevronDown } from '@lucide/svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
-	import { page } from '$app/state';
 
 	type DataTableProps<TData, TValue> = {
 		data: TData[];

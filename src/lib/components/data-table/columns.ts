@@ -1,6 +1,5 @@
 import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import DataTableSortable from './data-table-sortable.svelte';
-// bunimport DataTableActions from './data-table-actions.svelte';
 
 function formatDate(value: any): string {
 	return new Date(value).toLocaleDateString();
@@ -53,7 +52,7 @@ export function createTableColumns(schema: DatabaseSchema) {
 					variant: 'ghost',
 					columnName
 				}),
-			cell: ({ row }: any) => {
+			cell: ({ row }) => {
 				const value = row.getValue(columnName);
 
 				// Customize cell rendering based on type

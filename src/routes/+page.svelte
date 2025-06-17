@@ -4,11 +4,15 @@
 	import DrawingTools from '$lib/components/drawing-tools/drawing-tools.svelte';
 	import DataInput from '$lib/components/data-input/data-input.svelte';
 	import LayersSelection from '$lib/components/layers-selection/layers-selection.svelte';
+	import DataTableDialogWrapper from '$lib/components/data-table/data-table-dialog-wrapper.svelte';
 </script>
 
 <div class="app-container">
 	<DeckGL />
 	<ChartsDrawer />
+
+	<DataTableDialogWrapper />
+
 	<div
 		class="absolute left-0 right-0 top-4 z-10 flex flex-row items-start justify-between px-4 transition-all duration-200 ease-out"
 	>

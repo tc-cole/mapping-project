@@ -1,17 +1,21 @@
 <script lang="ts">
 	import * as Collapsible from '$lib/components/ui/collapsible';
 
-	import { layers } from '$lib/io/stores';
+	import { currentDataset, layers } from '$lib/io/stores';
+	import {
+		openDatasetDialog,
+		openDatasetPreview
+	} from '$lib/components/data-table/data-table-dialog-wrapper.svelte';
 	import {
 		X,
-		MapPin,
 		Layers,
 		AlertCircle,
 		CheckCircle,
 		Clock,
 		Eye,
 		EyeOff,
-		ChevronDown
+		ChevronDown,
+		Table
 	} from '@lucide/svelte';
 
 	import ScatterLayerConfiguration from './layer-configurations/scatter-layer-configuration.svelte';
@@ -79,7 +83,6 @@
 	// Get dataset icon
 	const DatasetIcon = $derived(dataset.icon || Layers);
 
-	// Format row count for display
 	const formattedRowCount = $derived.by(() => {
 		if (!dataset.rowCount) return '';
 		if (dataset.rowCount < 1000) return `${dataset.rowCount} rows`;
@@ -151,10 +154,10 @@
 				>
 					<!-- Dataset Icon with Color -->
 					<div
-						class="flex h-10 w-10 items-center justify-center rounded-lg text-white shadow-sm"
+						class="flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm"
 						style="background-color: {dataset.color || '#6b7280'}"
 					>
-						<DatasetIcon size={20} />
+						<DatasetIcon size={12} />
 					</div>
 
 					<!-- Main Content -->
@@ -162,9 +165,6 @@
 						<!-- Title and Status -->
 						<div class="mb-1 flex items-center gap-2">
 							<h3 class="truncate text-sm font-medium text-white">{displayTitle}</h3>
-							<div class="flex items-center gap-1 {statusInfo.color}">
-								<statusInfo.icon size={14} />
-							</div>
 						</div>
 
 						<!-- Metadata Row -->
@@ -176,23 +176,8 @@
 							{/if}
 
 							<!-- File Type -->
-							<span class="font-medium capitalize"
-								>{dataset.source.fileType || dataset.datasetType}</span
-							>
 
 							<!-- Location Info -->
-							{#if locationInfo?.hasCoords}
-								<span class="text-gray-500">•</span>
-								<div class="flex items-center gap-1 text-green-400">
-									<MapPin size={10} />
-									<span class="font-medium">Coordinates Ready</span>
-								</div>
-							{:else if locationInfo}
-								<span class="text-gray-500">•</span>
-								<span class="font-medium text-amber-400"
-									>{locationInfo.coordCount} coord suggestions</span
-								>
-							{/if}
 
 							<!-- Geometry Info -->
 							{#if geometryInfo}
@@ -236,6 +221,14 @@
 				{/if}
 			</button>
 
+			<button
+				class="rounded-md border border-gray-600 bg-gray-800/90 p-1.5 text-gray-300 backdrop-blur-sm transition-colors hover:bg-gray-700 hover:text-white"
+				onclick={() => {
+					openDatasetPreview(dataset);
+				}}
+			>
+				<Table size={14} />
+			</button>
 			<!-- Remove Button -->
 			<button
 				class="rounded-md border border-gray-600 bg-gray-800/90 p-1.5 text-gray-300 backdrop-blur-sm transition-colors hover:bg-gray-700 hover:text-red-400"

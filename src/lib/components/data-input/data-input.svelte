@@ -374,8 +374,7 @@
 										</p>
 										{#if isProcessing && processingFile === file.name}
 											<div class="flex items-center gap-1">
-												<Sparkles class="h-3 w-3 animate-pulse text-blue-500" />
-												<span class="text-xs text-blue-600">Analyzing...</span>
+												<span class="animate-pulse text-xs text-blue-600">Analyzing...</span>
 											</div>
 										{/if}
 									</div>
@@ -397,20 +396,6 @@
 						</li>
 					{/each}
 				</ul>
-			{/if}
-
-			{#if isProcessing}
-				<div
-					class="w-[300px] rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
-				>
-					<div class="flex items-center gap-2 text-sm">
-						<Sparkles class="h-4 w-4 animate-pulse text-blue-600" />
-						<span class="font-medium text-blue-900 dark:text-blue-100">Smart Analysis Active</span>
-					</div>
-					<p class="mt-1 text-xs text-blue-700 dark:text-blue-300">
-						Detecting location columns and analyzing data structure for "{processingFile}"...
-					</p>
-				</div>
 			{/if}
 		</div>
 	</Dialog.Content>
