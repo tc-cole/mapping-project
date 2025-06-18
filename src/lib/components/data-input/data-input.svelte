@@ -12,6 +12,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils';
+	import { openDatasetDialog } from '../data-table/data-table-dialog-wrapper.svelte';
 
 	// Add upload progress state
 	let isProcessing = $state(false);
@@ -364,24 +365,32 @@
 					{#each files as file}
 						<li class="flex items-center gap-2 overflow-hidden py-3">
 							<div class="flex min-w-0 flex-1 items-center justify-between gap-8">
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-sm font-medium text-gray-900 dark:text-white">
-										{file.name}
-									</p>
-									<div class="flex items-center gap-2">
-										<p class="truncate text-xs text-gray-500 dark:text-gray-400">
-											{file.type}
+								<button
+									class={buttonVariants({ variant: 'ghost' })}
+									onclick={() => {
+										openDatasetDialog(file);
+									}}
+								>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-sm font-medium text-gray-900 dark:text-white">
+											{file.name}
 										</p>
-										{#if isProcessing && processingFile === file.name}
-											<div class="flex items-center gap-1">
-												<span class="animate-pulse text-xs text-blue-600">Analyzing...</span>
-											</div>
-										{/if}
+										<div class="flex items-center gap-2">
+											<p class="truncate text-xs text-gray-500 dark:text-gray-400">
+												{file.type}
+											</p>
+											{#if isProcessing && processingFile === file.name}
+												<div class="flex items-center gap-1">
+													<span class="animate-pulse text-xs text-blue-600">Analyzing...</span>
+												</div>
+											{/if}
+										</div>
 									</div>
-								</div>
-								<div class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
-									{formatFileSize(file.size)}
-								</div>
+
+									<div class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
+										{formatFileSize(file.size)}
+									</div>
+								</button>
 							</div>
 							<button
 								class="grid place-items-center bg-transparent text-gray-500
